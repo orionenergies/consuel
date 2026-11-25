@@ -1,1 +1,123 @@
 # consuel
+
+Bot qui dépose automatiquement une attestation Consuel sur [monespaceconsuel.com](https://www.monespaceconsuel.com/connexion).
+Il est écrit en TypeScript avec Playwright (Chromium), exposé en HTTP et prévu pour être déployé sur Google Cloud Run.
+
+## Entrée
+
+Requête `POST /run` avec un corps JSON :
+
+| Champ           | Type     | Rôle                                                                    |
+| --------------- | -------- | ----------------------------------------------------------------------- |
+| `plantCode`     | string   | N° d'affaire (`numAffaire`) et nom de l'attestation (`<plantCode> - Consuel`) |
+| `injectedPower` | number   | Puissance installée (`puissanceInstallee`)                              |
+| `address`       | string   | Adresse libre, découpée en n° de rue / voie / code postal / commune     |
+| `projectType`   | string   | Contient `Hybride` : carte violette. Contient `Construction` : bâtiment neuf. Contient `Rénovation` : bâtiment existant. Sinon : sans bâtiment |
+| `siteName`      | string   | Nom du site (`nomSite`)                                                 |
+| `spv`           | string   | Propriétaire (`proprietaireName`)                                       |
+| `dre`           | url      | URL http(s) du DRE (rapport de l'organisme d'inspection), téléchargé puis importé |
+| `dryRun`        | boolean  | Optionnel. Si `true`, le bot s'arrête avant « Signer et envoyer »       |
+
+```json
+{
+  "plantCode": "PV001",
+  "injectedPower": 99.5,
+  "address": "12 bis rue des Lilas, 34000 Montpellier",
+  "projectType": "Construction",
+  "siteName": "Site de Montpellier",
+  "spv": "SPV Montpellier SAS",
+  "dre": "https://example.com/dre.pdf"
+}
+```
+
+### Réponses
+
+- `200` : `{ "status": "success" | "dry_run", "plantCode", "durationMs", "steps": [...], "finalUrl" }`
+- `400` : JSON d'entrée invalide (`status: "invalid_request"` et liste des erreurs)
+- `429` : un traitement est déjà en cours (un seul run à la fois par instance)
+- `500` : `{ "status": "error", "step", "message", "screenshotPath" }`. `step` indique l'étape du workflow en échec
+
+`GET /healthz` renvoie `{ "status": "ok" }`.
+
+## Workflow automatisé
+
+1. Connexion (`identifiant`, `password`, bouton `.connexion`), la bannière cookies est refusée si elle apparaît
+2. Clic sur `.creer_dossier`
+3. Clic sur `.24-plus` dans `.consuel-attestation-violet` (projet hybride) ou `.consuel-attestation-bleu`, puis « Étape suivante »
+4. Formulaire du site (`nomSite`, `proprietaireName`, `numAffaire`, `numRue`, `nomRue`, `codePostal`, `ville` choisie dans la liste selon la commune), `.geolocalization-validation-container`, « Étape suivante »
+5. « Créer le dossier »
+6. « Mes attestations à envoyer »
+7. Ouverture de la ligne `.pagination-liste-element--ligne` (celle qui contient le `plantCode`, sinon la première)
+8. Formulaire de l'attestation : `#typologieTypeId`, `#selectedSiteId` (Autre > Agricole > Stockage), `#typeProductionIdId` (dernière option, « Photovoltaïque avec protection DC »), `puissanceInstallee`, `isTensionSubMille` (premier élément, ≤ 1000V), `statutRapportOrganismeInspection`, import du DRE dans `rapportOrganismeInspection`, `nomAttestation`, « Enregistrer »
+9. Case `.pagination-liste-element--checkbox` de la ligne, puis `.envoyer`
+10. « Confirmer » puis « Enregistrer »
+11. Case « Je confirme » puis « Signer et envoyer »
+
+Le fichier `src/bot.ts` contient le workflow, et `src/ionic.ts` les fonctions génériques (listes déroulantes Ionic, cases à cocher, upload).
+
+## Configuration
+
+Les variables d'environnement sont décrites dans `.env.example`. Les deux obligatoires sont `CONSUEL_LOGIN` et `CONSUEL_PASSWORD`.
+Les identifiants ne sont jamais dans le code : en local, utiliser un fichier `.env` (ignoré par git) ; sur Cloud Run, Secret Manager.
+
+Autres options utiles : `HEADLESS=false` (voir le navigateur), `SLOW_MO_MS`, `DRY_RUN=true`, `RETURN_SCREENSHOT=true` (capture d'erreur en base64 dans la réponse 500).
+
+## Utilisation en local
+
+```bash
+npm install
+npx playwright install chromium     # première fois seulement
+cp .env.example .env                # puis renseigner les identifiants
+export $(grep -v '^#' .env | xargs)
+npm run dev                         # serveur sur http://localhost:8080
+npm run cli -- job.json             # ou exécution directe d'un JSON, sans serveur
+```
+
+```bash
+curl -X POST http://localhost:8080/run -H 'content-type: application/json' -d @job.json
+```
+
+Pour une première validation sur le vrai site, utiliser `"dryRun": true` avec `HEADLESS=false` : le bot fait tout sauf la signature finale (attention, les étapes 5 et 9 créent et envoient bien un dossier côté Consuel).
+
+## Tests
+
+```bash
+npm test
+```
+
+- tests unitaires : analyse d'adresse, règles métier, validation du JSON ;
+- test de bout en bout contre un faux site local (`test/mock-site.ts`) qui reproduit les sélecteurs du workflow : hybride ou non, dry run, commune introuvable, protection contre les URL internes.
+
+Le faux site ne remplace pas un essai sur le vrai site (voir « Points à valider »).
+
+## Déploiement sur Google Cloud Run
+
+```bash
+printf '%s' "<login>"    | gcloud secrets create consuel-login    --data-file=-
+printf '%s' "<password>" | gcloud secrets create consuel-password --data-file=-
+./deploy.sh        # build avec le Dockerfile puis déploiement
+```
+
+Paramètres retenus (voir `deploy.sh`) : 2 Gio de mémoire, timeout 900 s, `--concurrency 1`, `--max-instances 1` (le compte Consuel est partagé : deux runs simultanés se marcheraient dessus), service privé (`--no-allow-unauthenticated`).
+
+Appel avec authentification :
+
+```bash
+curl -X POST "$SERVICE_URL/run" \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -H 'content-type: application/json' -d @job.json
+```
+
+Les logs sont en JSON (`severity`, `message`), lisibles dans Cloud Logging.
+
+## Points à valider avant la mise en production
+
+- **Blocage possible par le WAF.** L'API de monespaceconsuel.com répond `403 Attack detected` depuis l'IP d'un datacenter AWS (testé depuis l'environnement de développement), ce qui empêche la connexion. Il faut vérifier que les IP de sortie de Cloud Run passent. Sinon, router la sortie par Cloud NAT avec une IP statique et demander au Consuel de l'autoriser.
+- **Sélecteurs et listes Ionic.** Les sélecteurs viennent de la description du workflow et n'ont pas pu être testés sur le vrai site connecté. Les points marqués « (Ajustement ?) » dans le besoin sont les plus fragiles : la sélection de la commune, la cascade Autre > Agricole > Stockage et le choix de la dernière option de production. En cas d'échec, la réponse 500 indique l'étape et une capture d'écran est enregistrée dans `SCREENSHOT_DIR`.
+- **Format de la puissance.** Si le champ est de type `number`, la valeur est envoyée avec un point, sinon avec une virgule. L'unité (kW, kVA...) n'est pas convertie : `injectedPower` doit déjà être dans l'unité attendue par le formulaire.
+- **Mot de passe.** Le mot de passe a été partagé en clair dans la demande initiale : il est conseillé de le changer avant la mise en production.
+
+## Sécurité
+
+- Le DRE n'est téléchargé que depuis une URL http(s) publique (adresses privées, loopback et serveur de métadonnées GCP refusés, redirections revérifiées, taille limitée à 25 Mo par défaut).
+- Le service Cloud Run doit rester privé : il déclenche un envoi réel au Consuel.
