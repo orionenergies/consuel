@@ -59,7 +59,7 @@ app.post('/run', requireApiKey, async (req, res) => {
 
   busy = true;
   const job = parsed.data;
-  logger.info('Run démarré', { plantCode: job.plantCode, projectType: job.projectType });
+  logger.info('Run démarré', { plantCode: job.plantCode, projectType: job.projectType, debug: job.debug === true });
   try {
     const result = await runJob(job);
     logger.info('Run terminé', { plantCode: job.plantCode, status: result.status, durationMs: result.durationMs });
@@ -75,6 +75,7 @@ app.post('/run', requireApiKey, async (req, res) => {
       message,
       screenshotPath: err instanceof StepError ? err.screenshotPath : undefined,
       screenshotBase64: err instanceof StepError ? err.screenshotBase64 : undefined,
+      ...(err instanceof StepError ? err.video : undefined),
     });
   } finally {
     busy = false;

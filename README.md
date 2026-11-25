@@ -17,6 +17,7 @@ Requête `POST /run` avec un corps JSON :
 | `spv`           | string   | Propriétaire (`proprietaireName`)                                       |
 | `dre`           | url      | URL http(s) du DRE (rapport de l'organisme d'inspection), téléchargé puis importé |
 | `dryRun`        | boolean  | Optionnel. Si `true`, le bot s'arrête avant « Signer et envoyer »       |
+| `debug`         | boolean  | Optionnel. Si `true`, enregistre l'écran et renvoie la vidéo webm       |
 
 ```json
 {
@@ -32,10 +33,12 @@ Requête `POST /run` avec un corps JSON :
 
 ### Réponses
 
-- `200` : `{ "status": "success" | "dry_run", "plantCode", "durationMs", "steps": [...], "finalUrl" }`
+- `200` : `{ "status": "success" | "dry_run", "plantCode", "durationMs", "steps": [...], "finalUrl" }`. Avec `debug: true`, ajoute `videoPath`, `videoBytes` et `videoBase64` (webm)
 - `400` : JSON d'entrée invalide (`status: "invalid_request"` et liste des erreurs)
 - `429` : un traitement est déjà en cours (un seul run à la fois par instance)
-- `500` : `{ "status": "error", "step", "message", "screenshotPath" }`. `step` indique l'étape du workflow en échec
+- `500` : `{ "status": "error", "step", "message", "screenshotPath" }`. `step` indique l'étape du workflow en échec. Avec `debug: true`, la même vidéo est jointe
+
+`debug: true` filme tout le run (succès ou erreur). Le fichier `.webm` est écrit dans `SCREENSHOT_DIR`, et son contenu est renvoyé en base64 pour Make.com. Au-delà de `VIDEO_MAX_BYTES` (16 Mio par défaut), le fichier reste sur le disque du conteneur et la réponse contient `videoOmittedReason` à la place de `videoBase64` : la réponse HTTP de Cloud Run est limitée à 32 Mio. Pour relire la vidéo : décoder `videoBase64` et l'enregistrer en `.webm`.
 
 `GET /healthz` renvoie `{ "status": "ok" }`.
 
@@ -158,7 +161,7 @@ Module HTTP « Make a request » :
 - **URL** : `<URL du service>/run` (affichée en fin de déploiement)
 - **Méthode** : `POST`
 - **Headers** : `Content-Type: application/json`, `x-api-key: <API_KEY>`
-- **Body** : le JSON décrit dans « Entrée » (`plantCode`, `injectedPower`, `address`, `projectType`, `siteName`, `spv`, `dre`)
+- **Body** : le JSON décrit dans « Entrée » (`plantCode`, `injectedPower`, `address`, `projectType`, `siteName`, `spv`, `dre`, et `debug: true` pour recevoir la vidéo)
 - **Timeout** : au moins 900 s (un run dure plusieurs minutes)
 
 Appel équivalent en ligne de commande :

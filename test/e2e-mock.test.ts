@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { access } from 'node:fs/promises';
 import { after, before, test } from 'node:test';
 
 import { startMockSite } from './mock-site';
@@ -37,6 +38,7 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
 
   const result = await runJob(job);
   assert.equal(result.status, 'success');
+  assert.equal(result.videoPath, undefined);
 
   const ev = (type: string) => site.events.filter((e) => e.type === type);
   const field = (name: string) => ev('field').filter((e) => e.name === name).pop()?.value;
@@ -74,11 +76,17 @@ test('projet hybride : carte violette, bâtiment neuf et dry run', { timeout: 12
   const { jobSchema } = await import('../src/schema');
   site.events.length = 0;
   const job = jobSchema.parse(
-    baseJob({ dre: `${site.url}/dre.pdf`, projectType: 'Construction Hybride', dryRun: true }),
+    baseJob({ dre: `${site.url}/dre.pdf`, projectType: 'Construction Hybride', dryRun: true, debug: true }),
   );
 
   const result = await runJob(job);
   assert.equal(result.status, 'dry_run');
+  assert.ok(result.videoPath?.endsWith('.webm'));
+  assert.ok(result.videoBase64);
+  const video = Buffer.from(result.videoBase64, 'base64');
+  assert.equal(video.subarray(0, 4).toString('hex'), '1a45dfa3');
+  assert.equal(result.videoBytes, video.length);
+  await access(result.videoPath);
   assert.equal(site.events.find((e) => e.type === 'type')?.hybrid, true);
   assert.deepEqual(
     site.events.find((e) => e.type === 'select' && e.name === 'typologie')?.path,
@@ -91,12 +99,14 @@ test('erreur claire si la commune est introuvable', { timeout: 120_000 }, async 
   const { runJob, StepError } = await import('../src/bot');
   const { jobSchema } = await import('../src/schema');
   const job = jobSchema.parse(
-    baseJob({ dre: `${site.url}/dre.pdf`, address: '1 rue X, 34000 Nulle-Part-Sur-Mer' }),
+    baseJob({ dre: `${site.url}/dre.pdf`, address: '1 rue X, 34000 Nulle-Part-Sur-Mer', debug: true }),
   );
   await assert.rejects(runJob(job), (err: unknown) => {
     assert.ok(err instanceof StepError);
     assert.match(err.step, /Formulaire du site/);
     assert.match(err.message, /Option introuvable/);
+    assert.ok(err.video?.videoPath?.endsWith('.webm'));
+    assert.equal(Buffer.from(err.video?.videoBase64 ?? '', 'base64').subarray(0, 4).toString('hex'), '1a45dfa3');
     return true;
   });
 });

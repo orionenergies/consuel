@@ -20,6 +20,8 @@ export const config = {
   dryRun: bool(process.env.DRY_RUN, false),
   screenshotDir: process.env.SCREENSHOT_DIR || '/tmp/screenshots',
   returnScreenshot: bool(process.env.RETURN_SCREENSHOT, false),
+  // Plafond du webm inclus dans la réponse HTTP (le base64 grossit d'un tiers).
+  videoMaxBytes: int(process.env.VIDEO_MAX_BYTES, 16 * 1024 * 1024),
   actionTimeoutMs: int(process.env.ACTION_TIMEOUT_MS, 30_000),
   runTimeoutMs: int(process.env.RUN_TIMEOUT_MS, 840_000),
   dreMaxBytes: int(process.env.DRE_MAX_BYTES, 25 * 1024 * 1024),

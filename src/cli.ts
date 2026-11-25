@@ -16,10 +16,26 @@ async function main(): Promise<void> {
   const job = jobSchema.parse(JSON.parse(raw));
   try {
     const result = await runJob(job);
-    console.log(JSON.stringify(result, null, 2));
+    const { videoBase64, ...printable } = result;
+    console.log(JSON.stringify(printable, null, 2));
+    if (videoBase64) console.error(`Vidéo base64 omise de la sortie (${result.videoBytes} octets) : ${result.videoPath}`);
   } catch (err) {
     if (err instanceof StepError) {
-      console.error(JSON.stringify({ status: 'error', step: err.step, message: err.message, screenshotPath: err.screenshotPath }, null, 2));
+      console.error(
+        JSON.stringify(
+          {
+            status: 'error',
+            step: err.step,
+            message: err.message,
+            screenshotPath: err.screenshotPath,
+            videoPath: err.video?.videoPath,
+            videoBytes: err.video?.videoBytes,
+            videoOmittedReason: err.video?.videoOmittedReason,
+          },
+          null,
+          2,
+        ),
+      );
     } else {
       console.error(err);
     }

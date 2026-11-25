@@ -1,7 +1,7 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import { chromium, type Browser, type Locator, type Page } from 'playwright';
+import { chromium, type Browser, type Locator, type Page, type Video } from 'playwright';
 
 import { parseAddress } from './address';
 import { config, getCredentials } from './config';
@@ -21,12 +21,20 @@ import {
 import * as logger from './logger';
 import type { Job } from './schema';
 
+export interface VideoPayload {
+  videoPath: string;
+  videoBytes: number;
+  videoBase64?: string;
+  videoOmittedReason?: string;
+}
+
 export class StepError extends Error {
   constructor(
     public readonly step: string,
     message: string,
     public readonly screenshotPath?: string,
     public readonly screenshotBase64?: string,
+    public readonly video?: VideoPayload,
   ) {
     super(message);
     this.name = 'StepError';
@@ -39,6 +47,21 @@ export interface RunResult {
   durationMs: number;
   steps: { name: string; durationMs: number }[];
   finalUrl: string;
+  videoPath?: string;
+  videoBase64?: string;
+  videoBytes?: number;
+  videoOmittedReason?: string;
+}
+
+/** Prépare la vidéo à renvoyer. Au-delà du plafond, le fichier reste sur disque mais sort de la réponse HTTP. */
+export function buildVideoPayload(filePath: string, buffer: Buffer, maxBytes: number): VideoPayload {
+  const payload: VideoPayload = { videoPath: filePath, videoBytes: buffer.length };
+  if (buffer.length > maxBytes) {
+    payload.videoOmittedReason = 'vidéo trop volumineuse pour la réponse HTTP';
+    return payload;
+  }
+  payload.videoBase64 = buffer.toString('base64');
+  return payload;
 }
 
 /** Valeurs de la liste "Typologie" selon le type de projet. */
@@ -62,12 +85,14 @@ export async function runJob(job: Job): Promise<RunResult> {
   const startedAt = Date.now();
   const steps: RunResult['steps'] = [];
   const dryRun = job.dryRun ?? config.dryRun;
+  const debug = job.debug === true;
   const { login, password } = getCredentials();
   const address = parseAddress(job.address);
   logger.info('Adresse analysée', { plantCode: job.plantCode, ...address });
 
   let browser: Browser | undefined;
   let page: Page | undefined;
+  let recording: Video | null = null;
   let current = 'initialisation';
   const dre = await downloadDre(job.dre).catch((err: Error) => {
     throw new StepError('téléchargement du DRE', err.message);
@@ -90,14 +115,21 @@ export async function runJob(job: Job): Promise<RunResult> {
       slowMo: config.slowMo,
       args: ['--no-sandbox', '--disable-dev-shm-usage'],
     });
+    const recordDir = path.join(config.screenshotDir, '.video-raw');
+    if (debug) {
+      await mkdir(recordDir, { recursive: true });
+      logger.info('Enregistrement vidéo activé', { plantCode: job.plantCode, dir: recordDir });
+    }
     const context = await browser.newContext({
       locale: 'fr-FR',
       timezoneId: 'Europe/Paris',
       viewport: { width: 1440, height: 900 },
       acceptDownloads: false,
+      ...(debug ? { recordVideo: { dir: recordDir, size: { width: 1440, height: 900 } } } : {}),
     });
     context.setDefaultTimeout(config.actionTimeoutMs);
     page = await context.newPage();
+    recording = page.video();
     const p = page;
 
     const timedOut = new Promise<never>((_, reject) => {
@@ -237,13 +269,19 @@ export async function runJob(job: Job): Promise<RunResult> {
       };
     };
 
-    return await Promise.race([workflow(), timedOut]);
+    const workflowPromise = workflow();
+    // Si le délai global gagne la course, le workflow peut encore rejeter après la fermeture de la page.
+    void workflowPromise.catch(() => undefined);
+    const result = await Promise.race([workflowPromise, timedOut]);
+    const video = await finalizeVideo(page, recording, job.plantCode);
+    return { ...result, ...video };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const stepName = err instanceof StepError ? err.step : current;
     if (err instanceof StepError) throw err;
     const shot = await captureFailure(page, job.plantCode);
-    throw new StepError(stepName, message, shot?.filePath, shot?.base64);
+    const video = await finalizeVideo(page, recording, job.plantCode);
+    throw new StepError(stepName, message, shot?.filePath, shot?.base64, video);
   } finally {
     if (timer) clearTimeout(timer);
     await browser?.close().catch(() => undefined);
@@ -258,6 +296,38 @@ async function rowIndexFor(rows: Locator, plantCode: string): Promise<number> {
   const idx = texts.findIndex((t) => norm(t).includes(wanted));
   if (idx < 0) logger.warn('Ligne correspondant au plantCode introuvable, utilisation de la première', { plantCode });
   return Math.max(idx, 0);
+}
+
+/** Ferme la page pour flush la vidéo Playwright, puis la copie sous un nom stable. */
+async function finalizeVideo(
+  page: Page | undefined,
+  video: Video | null,
+  plantCode: string,
+): Promise<VideoPayload | undefined> {
+  if (!video) return undefined;
+  const safe = plantCode.replace(/[^\w-]/g, '_');
+  const filePath = path.join(config.screenshotDir, `${safe}-${Date.now()}.webm`);
+  try {
+    await mkdir(config.screenshotDir, { recursive: true });
+    const saving = video.saveAs(filePath);
+    if (page && !page.isClosed()) await page.close().catch(() => undefined);
+    await saving;
+    const raw = await video.path().catch(() => undefined);
+    if (raw && path.resolve(raw) !== path.resolve(filePath)) await unlink(raw).catch(() => undefined);
+    const buffer = await readFile(filePath);
+    logger.info('Vidéo enregistrée', { filePath, bytes: buffer.length });
+    return buildVideoPayload(filePath, buffer, config.videoMaxBytes);
+  } catch (e) {
+    logger.warn('Vidéo impossible', { error: String(e) });
+    // saveAs peut avoir écrit un fichier partiel : on tente de le relire.
+    try {
+      const buffer = await readFile(filePath);
+      if (buffer.length > 0) return buildVideoPayload(filePath, buffer, config.videoMaxBytes);
+    } catch {
+      await unlink(filePath).catch(() => undefined);
+    }
+    return undefined;
+  }
 }
 
 async function captureFailure(

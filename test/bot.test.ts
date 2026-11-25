@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { formatPower, isHybrid, typologieFor } from '../src/bot';
+import { buildVideoPayload, formatPower, isHybrid, typologieFor } from '../src/bot';
 import { norm } from '../src/ionic';
 import { jobSchema } from '../src/schema';
 
@@ -39,7 +39,23 @@ test('validation du JSON d\'entrée', () => {
   });
   assert.equal(ok.success, true);
   assert.equal(ok.data?.injectedPower, 250.5);
+  assert.equal(ok.data?.debug, undefined);
+
+  const withDebug = jobSchema.safeParse({ ...ok.data, debug: true });
+  assert.equal(withDebug.success, true);
+  assert.equal(withDebug.data?.debug, true);
 
   const ko = jobSchema.safeParse({ plantCode: '', dre: 'ftp://x' });
   assert.equal(ko.success, false);
+});
+
+test('la vidéo dépasse le plafond : fichier conservé, base64 omis', () => {
+  const small = buildVideoPayload('/tmp/a.webm', Buffer.from('webm'), 10);
+  assert.equal(small.videoBase64, Buffer.from('webm').toString('base64'));
+  assert.equal(small.videoOmittedReason, undefined);
+
+  const big = buildVideoPayload('/tmp/a.webm', Buffer.from('webm-trop-gros'), 4);
+  assert.equal(big.videoBase64, undefined);
+  assert.equal(big.videoBytes, Buffer.from('webm-trop-gros').length);
+  assert.match(big.videoOmittedReason ?? '', /trop volumineuse/);
 });
