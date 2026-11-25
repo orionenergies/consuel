@@ -18,7 +18,7 @@
 #   GCP_REGION=europe-west9         (Paris, défaut)
 #   SERVICE_NAME=consuel-bot
 #   STATIC_EGRESS_IP=true           IP de sortie fixe (Cloud NAT), voir setup-cloudrun-static-egress.sh
-#   ALLOW_UNAUTHENTICATED=true      service public (ex. appel depuis Make.com), privé par défaut
+#   ALLOW_UNAUTHENTICATED=false     service privé (jeton Google requis), public par défaut pour Make.com
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -54,7 +54,7 @@ GCP_PROJECT="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null || tru
 GCP_REGION="${GCP_REGION:-europe-west9}"
 SERVICE_NAME="${SERVICE_NAME:-consuel-bot}"
 STATIC_EGRESS_IP="${STATIC_EGRESS_IP:-false}"
-ALLOW_UNAUTHENTICATED="${ALLOW_UNAUTHENTICATED:-false}"
+ALLOW_UNAUTHENTICATED="${ALLOW_UNAUTHENTICATED:-true}"
 
 gcloud config set project "$GCP_PROJECT" --quiet
 
@@ -101,9 +101,9 @@ if [[ "$PRESERVE_ENV" -eq 0 ]]; then
   grant_secret_access
 fi
 
-AUTH_FLAG="--no-allow-unauthenticated"
-if [[ "$ALLOW_UNAUTHENTICATED" == "true" ]]; then
-  AUTH_FLAG="--allow-unauthenticated"
+AUTH_FLAG="--allow-unauthenticated"
+if [[ "$ALLOW_UNAUTHENTICATED" != "true" ]]; then
+  AUTH_FLAG="--no-allow-unauthenticated"
 fi
 
 CONFIG_ARGS=()

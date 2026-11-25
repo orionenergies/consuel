@@ -116,10 +116,10 @@ Variables du script :
 | `GCP_REGION`            | `europe-west9` | Région Cloud Run (Paris)                                                               |
 | `SERVICE_NAME`          | `consuel-bot`  | Nom du service                                                                         |
 | `STATIC_EGRESS_IP`      | `false`        | `true` : IP de sortie fixe (Cloud NAT), voir ci-dessous                                |
-| `ALLOW_UNAUTHENTICATED` | `false`        | `true` : service public (inpi-bot l'est, pour Make.com). Déconseillé : voir « Sécurité » |
+| `ALLOW_UNAUTHENTICATED` | `true`         | `true` : service public (appelable depuis Make.com, comme inpi-bot). `false` : privé, jeton Google requis |
 | `GCP_SA_KEY`            |                | JSON d'un compte de service (agents Cloud), sinon `gcloud auth login`                  |
 
-Paramètres retenus : 2 Gio de mémoire, 2 vCPU, timeout 900 s, `--concurrency 1`, `--max-instances 1` (le compte Consuel est partagé : deux runs simultanés se marcheraient dessus), `--min-instances 0`, service privé par défaut.
+Paramètres retenus : 2 Gio de mémoire, 2 vCPU, timeout 900 s, `--concurrency 1`, `--max-instances 1` (le compte Consuel est partagé : deux runs simultanés se marcheraient dessus), `--min-instances 0`, service public (`--allow-unauthenticated`) pour être appelé depuis Make.com.
 
 ### IP de sortie fixe (Cloud NAT)
 
@@ -137,13 +137,23 @@ Le script crée (de façon idempotente) l'adresse `consuel-egress-ip`, le routeu
 
 Cloud Run n'a pas d'IP de sortie fixe par défaut : elle est choisie dans les plages Google de la région du service. Avec `europe-west9`, ces plages sont déclarées en France (Paris) dans le [geofeed publié par Google](https://www.gstatic.com/ipranges/cloud_geofeed) (`34.155.0.0/16`, `34.163.0.0/16`, `34.1.0.0/20`, etc.). L'IP réservée par `STATIC_EGRESS_IP=true` est une adresse régionale `europe-west9`, donc dans ces plages. Elle reste une IP de datacenter Google : les bases de géolocalisation tierces peuvent mettre du temps à refléter le geofeed. À titre de comparaison, inpi-bot est en `europe-west1` (IP `34.62.155.159`, Belgique). Vérification après déploiement : `GET /diag` renvoie `egressIp`.
 
-Appel avec authentification :
+### Appel depuis Make.com
+
+Module HTTP « Make a request » :
+
+- **URL** : `<URL du service>/run` (affichée en fin de déploiement)
+- **Méthode** : `POST`
+- **Headers** : `Content-Type: application/json`
+- **Body** : le JSON décrit dans « Entrée » (`plantCode`, `injectedPower`, `address`, `projectType`, `siteName`, `spv`, `dre`)
+- **Timeout** : au moins 900 s (un run dure plusieurs minutes)
+
+Appel équivalent en ligne de commande :
 
 ```bash
-curl -X POST "$SERVICE_URL/run" \
-  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-  -H 'content-type: application/json' -d @job.json
+curl -X POST "$SERVICE_URL/run" -H 'content-type: application/json' -d @job.json
 ```
+
+Pour repasser le service en privé : `ALLOW_UNAUTHENTICATED=false ./scripts/deploy-cloud-run.sh --preserve-env`, puis appeler avec `-H "Authorization: Bearer $(gcloud auth print-identity-token)"`.
 
 Les logs sont en JSON (`severity`, `message`), lisibles dans Cloud Logging.
 
@@ -157,4 +167,4 @@ Les logs sont en JSON (`severity`, `message`), lisibles dans Cloud Logging.
 ## Sécurité
 
 - Le DRE n'est téléchargé que depuis une URL http(s) publique (adresses privées, loopback et serveur de métadonnées GCP refusés, redirections revérifiées, taille limitée à 25 Mo par défaut).
-- Le service Cloud Run doit rester privé : il déclenche un envoi réel au Consuel. Si un appelant sans jeton Google (Make.com) impose `ALLOW_UNAUTHENTICATED=true`, protéger l'accès autrement (par exemple une clé d'API vérifiée par le service).
+- Le service Cloud Run est public pour être appelé depuis Make.com : toute personne connaissant l'URL peut déclencher un envoi réel au Consuel. Garder l'URL confidentielle ; pour la protéger, ajouter une clé d'API vérifiée par le service (en-tête envoyé par Make.com) ou repasser en privé.
