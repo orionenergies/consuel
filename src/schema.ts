@@ -12,6 +12,8 @@ export const jobSchema = z.object({
     .refine((u) => /^https?:\/\//i.test(u), 'dre doit être une URL http(s)'),
   // Optionnel : permet à l'appelant de forcer un arrêt avant la signature finale.
   dryRun: z.boolean().optional(),
+  // Optionnel : enregistre la vidéo de l'écran et la renvoie (webm, base64).
+  debug: z.boolean().optional(),
 });
 
 export type Job = z.infer<typeof jobSchema>;
