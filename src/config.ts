@@ -11,6 +11,10 @@ export const config = {
     return process.env.BASE_URL || 'https://www.monespaceconsuel.com';
   },
   port: int(process.env.PORT, 8080),
+  get apiKey(): string {
+    return process.env.API_KEY || '';
+  },
+  production: process.env.NODE_ENV === 'production',
   headless: bool(process.env.HEADLESS, true),
   slowMo: int(process.env.SLOW_MO_MS, 0),
   dryRun: bool(process.env.DRY_RUN, false),

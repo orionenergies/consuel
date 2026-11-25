@@ -1,5 +1,6 @@
 import express from 'express';
 
+import { apiKeyAuth } from './auth';
 import { runJob, StepError } from './bot';
 import { config } from './config';
 import * as logger from './logger';
@@ -8,6 +9,8 @@ import { jobSchema } from './schema';
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
+
+const requireApiKey = apiKeyAuth({ apiKey: config.apiKey, production: config.production });
 
 // Le compte Consuel est partagé : un seul run à la fois par instance
 // (à combiner avec --concurrency=1 --max-instances=1 sur Cloud Run).
@@ -18,7 +21,7 @@ app.get('/healthz', (_req, res) => {
 });
 
 // Diagnostic : IP de sortie du service et accueil réservé par l'API Consuel (WAF).
-app.get('/diag', async (_req, res) => {
+app.get('/diag', requireApiKey, async (_req, res) => {
   const probe = async (url: string, init?: RequestInit) => {
     try {
       const r = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
@@ -39,7 +42,7 @@ app.get('/diag', async (_req, res) => {
   });
 });
 
-app.post('/run', async (req, res) => {
+app.post('/run', requireApiKey, async (req, res) => {
   const parsed = jobSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -77,6 +80,10 @@ app.post('/run', async (req, res) => {
     busy = false;
   }
 });
+
+if (config.production && !config.apiKey) {
+  logger.error('API_KEY manquante en production : /run et /diag refusent toutes les requêtes');
+}
 
 const server = app.listen(config.port, () => {
   logger.info(`Serveur démarré sur le port ${config.port}`);

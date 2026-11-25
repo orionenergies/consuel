@@ -1,0 +1,12 @@
+# Upload source Cloud Run / Cloud Build
+.git/
+node_modules/
+dist/
+screenshots/
+tmp/
+test/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
