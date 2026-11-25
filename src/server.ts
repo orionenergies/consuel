@@ -17,6 +17,28 @@ app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Diagnostic : IP de sortie du service et accueil réservé par l'API Consuel (WAF).
+app.get('/diag', async (_req, res) => {
+  const probe = async (url: string, init?: RequestInit) => {
+    try {
+      const r = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
+      return { status: r.status, body: (await r.text()).slice(0, 200) };
+    } catch (e) {
+      return { status: 0, body: String(e) };
+    }
+  };
+  const [ip, site, api] = await Promise.all([
+    probe('https://api.ipify.org'),
+    probe(config.baseUrl),
+    probe('https://api.monespaceconsuel.com/'),
+  ]);
+  res.json({
+    egressIp: ip.body,
+    site: { status: site.status },
+    api: { status: api.status, bloque: api.status === 403 },
+  });
+});
+
 app.post('/run', async (req, res) => {
   const parsed = jobSchema.safeParse(req.body);
   if (!parsed.success) {

@@ -39,6 +39,8 @@ Requête `POST /run` avec un corps JSON :
 
 `GET /healthz` renvoie `{ "status": "ok" }`.
 
+`GET /diag` renvoie l'IP de sortie du service et le code HTTP reçu du site et de son API (`api.bloque: true` si le pare-feu du Consuel répond 403). À appeler après le premier déploiement.
+
 ## Workflow automatisé
 
 1. Connexion (`identifiant`, `password`, bouton `.connexion`), la bannière cookies est refusée si elle apparaît
@@ -99,6 +101,8 @@ printf '%s' "<password>" | gcloud secrets create consuel-password --data-file=-
 ```
 
 Paramètres retenus (voir `deploy.sh`) : 2 Gio de mémoire, timeout 900 s, `--concurrency 1`, `--max-instances 1` (le compte Consuel est partagé : deux runs simultanés se marcheraient dessus), service privé (`--no-allow-unauthenticated`).
+
+Pour une IP de sortie fixe (à faire autoriser par le Consuel si `/diag` indique `bloque: true`) : `STATIC_EGRESS_IP=true ./deploy.sh` (Cloud NAT, l'IP est affichée à la fin).
 
 Appel avec authentification :
 
