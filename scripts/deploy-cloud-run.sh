@@ -8,6 +8,7 @@
 # Premier déploiement ou rotation des secrets :
 #   export GCP_PROJECT=orion-bots
 #   export CONSUEL_LOGIN=…  CONSUEL_PASSWORD=…     # stockés dans Secret Manager
+#   export API_KEY=…                               # clé x-api-key (secret partagé api-key, jamais écrasé s'il existe)
 #   ./scripts/deploy-cloud-run.sh
 #
 # Redéploiement du code seul (secrets et variables du service live conservés) :
@@ -78,7 +79,7 @@ grant_secret_access() {
   local project_number runtime_sa name
   project_number="$(gcloud projects describe "$GCP_PROJECT" --format='value(projectNumber)')"
   runtime_sa="${RUNTIME_SERVICE_ACCOUNT:-${project_number}-compute@developer.gserviceaccount.com}"
-  for name in consuel-login consuel-password; do
+  for name in consuel-login consuel-password api-key; do
     gcloud secrets add-iam-policy-binding "$name" \
       --project "$GCP_PROJECT" \
       --member "serviceAccount:${runtime_sa}" \
@@ -98,6 +99,16 @@ if [[ "$PRESERVE_ENV" -eq 0 ]]; then
       fi
     done
   fi
+  # api-key est partagé entre les bots Orion : créé s'il manque, jamais mis à jour ici.
+  if ! gcloud secrets describe api-key --project "$GCP_PROJECT" >/dev/null 2>&1; then
+    if [[ -z "${API_KEY:-}" ]]; then
+      echo "Secret api-key introuvable : exporter API_KEY (clé x-api-key attendue par le service)." >&2
+      exit 1
+    fi
+    upsert_secret api-key "$API_KEY"
+  else
+    echo "Secret api-key existant (partagé entre les bots), conservé."
+  fi
   grant_secret_access
 fi
 
@@ -111,7 +122,7 @@ if [[ "$PRESERVE_ENV" -eq 1 ]]; then
   echo "Mode --preserve-env : conserve secrets et variables d'environnement du service live."
 else
   CONFIG_ARGS+=(
-    --set-secrets "CONSUEL_LOGIN=consuel-login:latest,CONSUEL_PASSWORD=consuel-password:latest"
+    --set-secrets "CONSUEL_LOGIN=consuel-login:latest,CONSUEL_PASSWORD=consuel-password:latest,API_KEY=api-key:latest"
     --set-env-vars "HEADLESS=true,RUN_TIMEOUT_MS=840000,ACTION_TIMEOUT_MS=45000"
   )
 fi
@@ -145,11 +156,11 @@ URL="$(gcloud run services describe "$SERVICE_NAME" \
 echo
 echo "Service déployé : ${URL}"
 echo "Health  : ${URL}/healthz"
-echo "Diag    : ${URL}/diag   (IP de sortie + blocage éventuel du WAF Consuel)"
+echo "Diag    : ${URL}/diag   (IP de sortie + blocage éventuel du WAF Consuel, header x-api-key requis)"
 echo "Requête : POST ${URL}/run"
 echo
 if [[ "$ALLOW_UNAUTHENTICATED" == "true" ]]; then
-  echo "curl -sS -X POST '${URL}/run' -H 'Content-Type: application/json' -d @job.json"
+  echo "curl -sS -X POST '${URL}/run' -H 'x-api-key: <API_KEY>' -H 'Content-Type: application/json' -d @job.json"
 else
   echo "curl -sS -X POST '${URL}/run' -H \"Authorization: Bearer \$(gcloud auth print-identity-token)\" -H 'Content-Type: application/json' -d @job.json"
 fi
