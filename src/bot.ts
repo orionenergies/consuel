@@ -173,11 +173,12 @@ export async function runJob(job: Job): Promise<RunResult> {
         await fillField(p, 'nomSite', job.siteName);
         await fillField(p, 'proprietaireName', job.spv);
         await fillField(p, 'numAffaire', job.plantCode);
-        if (address.numRue) await fillField(p, 'numRue', address.numRue);
-        await fillField(p, 'nomRue', address.nomRue);
         await fillField(p, 'codePostal', address.codePostal);
         await settle(p);
         await chooseVille(p, address.ville, address.codePostal);
+        await settle(p);
+        if (address.numRue) await fillField(p, 'numRue', address.numRue);
+        await fillField(p, 'nomRue', address.nomRue);
         await settle(p);
         await p.locator('.geolocalization-validation-container').first().click();
         await settle(p);
