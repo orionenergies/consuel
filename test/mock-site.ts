@@ -184,6 +184,7 @@ const views = {
     + '<ion-button class="save"><span>Enregistrer</span></ion-button>');
     const coverSelect = (id) => {
       const host = document.getElementById(id);
+      host.setAttribute('role', 'button');
       host.style.position = 'relative';
       const shadow = host.attachShadow({ mode: 'open' });
       const button = document.createElement('button');
@@ -193,7 +194,9 @@ const views = {
       label.textContent = 'Choisir';
       label.style.cssText = 'position:absolute;inset:0;display:block';
       shadow.append(button, label);
-      button.addEventListener('click', (ev) => ev.stopPropagation());
+      const stop = (ev) => ev.stopPropagation();
+      button.addEventListener('click', stop);
+      label.addEventListener('click', stop);
     };
     coverSelect('typologieTypeId');
     coverSelect('typeProductionIdId');
