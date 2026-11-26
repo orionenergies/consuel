@@ -82,11 +82,18 @@ const views = {
     bindBtn('.creer_dossier', () => go('type'));
   },
   type(){
-    h('<div class="consuel-attestation-bleu"><div class="24-plus">bleu</div></div>'
-    + '<div class="consuel-attestation-violet"><div class="24-plus">violet</div></div>'
-    + '<ion-button><span>Étape suivante</span></ion-button>');
-    document.querySelectorAll('[class~="24-plus"]').forEach(e => e.addEventListener('click', () => { hybrid = e.parentElement.className.includes('violet'); log('type', {hybrid}); }));
-    document.querySelector('ion-button').addEventListener('click', () => go('site'));
+    h('<div class="consuel-attestation-bleu"><button type="button" class="24-plus">+</button></div>'
+    + '<div class="consuel-attestation-violet"><button type="button" class="24-plus">+</button></div>'
+    + '<ion-button disabled aria-disabled="true" class="button-disabled"><span>Étape suivante</span></ion-button>');
+    const next = document.querySelector('ion-button');
+    document.querySelectorAll('[class~="24-plus"]').forEach(e => e.addEventListener('click', () => {
+      hybrid = e.parentElement.className.includes('violet');
+      log('type', {hybrid});
+      next.removeAttribute('disabled');
+      next.setAttribute('aria-disabled', 'false');
+      next.classList.remove('button-disabled');
+    }));
+    next.addEventListener('click', () => { if (!next.hasAttribute('disabled')) go('site'); });
   },
   site(){
     h(['nomSite','proprietaireName','numAffaire','numRue','nomRue','codePostal'].map(n => '<ion-input formcontrolname="'+n+'"><input type="text"></ion-input>').join('')

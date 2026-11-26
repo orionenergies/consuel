@@ -80,6 +80,31 @@ export async function clickByText(
   throw new Error(`Bouton ou texte introuvable : ${String(text)}`);
 }
 
+/**
+ * Clique un bouton visible seulement une fois qu'il n'est plus désactivé.
+ * « Étape suivante » est souvent déjà affiché, mais inactif tant qu'une action précédente n'a pas eu lieu.
+ */
+export async function clickEnabledByText(
+  page: Page,
+  text: string | RegExp,
+  opts: { timeout?: number } = {},
+): Promise<void> {
+  const re = typeof text === 'string' ? looseRegex(text) : text;
+  const timeout = opts.timeout ?? 30_000;
+  const button = page
+    .locator(
+      'ion-button:not([disabled]):not([aria-disabled="true"]):not(.button-disabled), button:not([disabled]):not([aria-disabled="true"]):not(.button-disabled)',
+    )
+    .filter({ hasText: re })
+    .filter({ visible: true });
+  try {
+    await button.first().click({ timeout });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`Bouton inactif ou introuvable : ${String(text)}. ${detail}`);
+  }
+}
+
 /** Remplit un champ Angular (ion-input, input, textarea) identifié par formcontrolname. */
 export async function fillField(page: Page, controlName: string, value: string): Promise<void> {
   const host = page.locator(`[formcontrolname="${controlName}"]`).first();
