@@ -182,6 +182,21 @@ const views = {
     + '<div class="import-multiple-file-container" style="display:none">Importer<input type="file"></div>'
     + '<ion-input formcontrolname="nomAttestation"><input type="text"></ion-input>'
     + '<ion-button class="save"><span>Enregistrer</span></ion-button>');
+    const coverSelect = (id) => {
+      const host = document.getElementById(id);
+      host.style.position = 'relative';
+      const shadow = host.attachShadow({ mode: 'open' });
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.style.cssText = 'width:100%;height:24px';
+      const label = document.createElement('label');
+      label.textContent = 'Choisir';
+      label.style.cssText = 'position:absolute;inset:0;display:block';
+      shadow.append(button, label);
+      button.addEventListener('click', (ev) => ev.stopPropagation());
+    };
+    coverSelect('typologieTypeId');
+    coverSelect('typeProductionIdId');
     const sel = (id, name, levels, tag) => document.getElementById(id).addEventListener('click', () => openPopover(document.getElementById(id), name, levels, null, tag));
     sel('typologieTypeId','typologie',[['Bâtiment neuf','Bâtiment existant','Sans bâtiment']],'ion-popover');
     sel('selectedSiteId','site',[['Sol','Autre','Toiture'],['Industriel','Agricole'],['Serre','Stockage - Entrepot']],'ion-popover');

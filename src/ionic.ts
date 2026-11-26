@@ -203,9 +203,9 @@ export async function chooseOption(
   let lastTexts: string[] = [];
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const native = tag === 'ion-select' ? control.locator('button') : null;
-    if (native && (await native.count()) > 0) await native.first().click();
-    else await control.click();
+    // Le bouton interne d'un ion-select est recouvert par son <label> (aria-labelledby).
+    // Le clic porte sur l'hôte : le label laisse passer l'événement jusqu'à lui.
+    await control.click();
 
     let ok = true;
     for (let level = 0; level < path.length; level++) {
