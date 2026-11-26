@@ -56,7 +56,10 @@ function openPopover(host, name, levels, onDone, tag){
         radio.addEventListener('click', (ev) => ev.stopPropagation());
         it.addEventListener('click', choose);
       } else {
-        it.textContent = label;
+        it.className = 'ion-item-select item';
+        const span = document.createElement('span');
+        span.textContent = ' ' + label + ' ';
+        it.append(span);
         it.addEventListener('click', choose);
       }
       pop.appendChild(it);
@@ -199,11 +202,16 @@ const views = {
       label.addEventListener('click', stop);
     };
     coverSelect('typologieTypeId');
+    coverSelect('selectedSiteId');
     coverSelect('typeProductionIdId');
     const sel = (id, name, levels, tag) => document.getElementById(id).addEventListener('click', () => openPopover(document.getElementById(id), name, levels, null, tag));
     sel('typologieTypeId','typologie',[['Bâtiment neuf','Bâtiment existant','Sans bâtiment']],'ion-popover');
-    sel('selectedSiteId','site',[['Sol','Autre','Toiture'],['Industriel','Agricole'],['Serre','Stockage - Entrepot']],'ion-popover');
-    sel('typeProductionIdId','production',[['Photovoltaïque','Photovoltaïque avec stockage','Photovoltaïque avec protection DC']],'ion-popover');
+    sel('selectedSiteId','site',[
+      ['Habitation','Autre'],
+      ['Agricole','Industrielle','Sans bâtiment','Spéciaux','Tertiaire'],
+      ['Culture (céréales, légumes, fruits, vins, ...) & irrigation (pompage) & bois','Elevage (étable, stabulations, bergerie, pisciculture, ...)','Stockage – Entrepôt (silos céréales, paille, fourrage, stockage, ...)'],
+    ],'ion-popover');
+    sel('typeProductionIdId','production',[['Photovoltaïque sans protection DC','Eolien','Cogénération','Biomasse','Hydraulique','Photovoltaïque avec protection DC']],'ion-popover');
     inputs(['puissanceInstallee','nomAttestation']);
     document.querySelectorAll('ion-item.tension').forEach((item, i) => {
       item.querySelector('ion-radio').addEventListener('click', (ev) => ev.stopPropagation());

@@ -8,7 +8,7 @@ export const norm = (s: string): string =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[-'’_.]/g, ' ')
+    .replace(/[-'’_.\u2010\u2011\u2012\u2013\u2014\u2212]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -140,10 +140,18 @@ const OPTION_SELECTOR = [
 
 export type OptionChoice = string | 'FIRST' | 'LAST';
 
-async function visibleOptions(page: Page): Promise<{ locator: Locator; texts: string[] }> {
-  const locator = page.locator(OPTION_SELECTOR).filter({ visible: true });
-  const texts = (await locator.allInnerTexts()).map((t) => t.trim());
-  return { locator, texts };
+async function listedOptions(page: Page): Promise<{ item: Locator; text: string }[]> {
+  const all = page.locator(`${OPTION_SELECTOR}, ion-item.ion-item-select`).filter({ visible: true });
+  const count = await all.count();
+  const out: { item: Locator; text: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    const item = all.nth(i);
+    const hidden = await item.evaluate((el) => !!el.closest('.overlay-hidden'));
+    if (hidden) continue;
+    const text = ((await item.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+    if (text) out.push({ item, text });
+  }
+  return out;
 }
 
 function pickIndex(texts: string[], choice: OptionChoice): number {
@@ -203,9 +211,9 @@ export async function chooseOption(
   let lastTexts: string[] = [];
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    // ion-select#typologieTypeId est lui-même le bouton (role="button").
-    // Son bouton interne est recouvert par un label : un clic de pointeur n'arrive pas.
-    if (tag === 'ion-select') {
+    // L'hôte (ion-select ou app-select-multilevel) est le bouton.
+    // Son bouton interne est recouvert : un clic de pointeur n'arrive pas.
+    if (tag === 'ion-select' || tag === 'app-select-multilevel') {
       const expanded = ((await control.getAttribute('class')) ?? '').includes('select-expanded');
       if (!expanded) await control.dispatchEvent('click');
     } else {
@@ -217,13 +225,17 @@ export async function chooseOption(
       const choice = path[level];
       let found = false;
       for (let poll = 0; poll < 20 && !found; poll++) {
-        const { locator, texts } = await visibleOptions(page);
+        const options = await listedOptions(page);
+        const texts = options.map((o) => o.text);
         lastTexts = texts;
         if (texts.length > 0) {
           let idx = pickIndex(texts, choice);
           if (idx < 0 && opts.fallbackIfSingle && level === path.length - 1 && texts.length === 1) idx = 0;
           if (idx >= 0) {
-            await locator.nth(idx).click();
+            const item = options[idx].item;
+            const itemTag = await item.evaluate((el) => el.tagName.toLowerCase());
+            if (itemTag === 'ion-item' || itemTag === 'ion-select-option') await item.dispatchEvent('click');
+            else await item.click();
             found = true;
             break;
           }

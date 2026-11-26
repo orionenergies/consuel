@@ -65,7 +65,11 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
   assert.equal(ev('create').length, 1);
   assert.match(String(ev('open')[0].row), /PV001/);
   assert.deepEqual(ev('select').find((e) => e.name === 'typologie')?.path, ['Bâtiment existant']);
-  assert.deepEqual(ev('select').find((e) => e.name === 'site')?.path, ['Autre', 'Agricole', 'Stockage - Entrepot']);
+  assert.deepEqual(ev('select').find((e) => e.name === 'site')?.path, [
+    'Autre',
+    'Agricole',
+    'Stockage – Entrepôt (silos céréales, paille, fourrage, stockage, ...)',
+  ]);
   assert.deepEqual(ev('select').find((e) => e.name === 'production')?.path, ['Photovoltaïque avec protection DC']);
   assert.equal(field('puissanceInstallee'), '99.5');
   assert.equal(ev('radio').length, 1);
