@@ -22,7 +22,7 @@ const PAGE = /* html */ `<!doctype html><html><head><meta charset="utf-8"><title
 </style></head><body><div id="app"></div>
 <script>
 const app = document.getElementById('app');
-const log = (type, data) => fetch('/__log', {method:'POST', body: JSON.stringify({type, ...data})});
+const log = (type, data) => fetch('/__log', {method:'POST', body: JSON.stringify({type, at: Date.now(), ...data})});
 const state = { selects: {}, fields: {}, checks: {} };
 let hybrid = false;
 

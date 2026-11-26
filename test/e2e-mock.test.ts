@@ -43,7 +43,8 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
   const ev = (type: string) => site.events.filter((e) => e.type === type);
   const field = (name: string) => ev('field').filter((e) => e.name === name).pop()?.value;
 
-  assert.deepEqual(ev('login')[0], { type: 'login', id: 'login-test', pw: 'mdp-test' });
+  assert.equal(ev('login')[0].id, 'login-test');
+  assert.equal(ev('login')[0].pw, 'mdp-test');
   assert.equal(ev('type')[0].hybrid, false);
   assert.equal(field('nomSite'), 'Site de test');
   assert.equal(field('proprietaireName'), 'SPV Test');
@@ -56,6 +57,9 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
     .filter((e) => (e.type === 'field' && (e.name === 'codePostal' || e.name === 'numRue' || e.name === 'nomRue')) || (e.type === 'select' && e.name === 'ville') || e.type === 'geoloc')
     .map((e) => (e.type === 'field' || e.type === 'select' ? `${e.type}:${e.name}` : e.type));
   assert.deepEqual(addressOrder, ['field:codePostal', 'select:ville', 'field:numRue', 'field:nomRue', 'geoloc']);
+  const nomRueAt = Number(ev('field').filter((e) => e.name === 'nomRue').pop()?.at);
+  const geolocAt = Number(ev('geoloc')[0].at);
+  assert.ok(geolocAt - nomRueAt >= 1_000);
   assert.equal(ev('geoloc').length, 1);
   assert.equal(ev('create').length, 1);
   assert.match(String(ev('open')[0].row), /PV001/);
@@ -63,7 +67,8 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
   assert.deepEqual(ev('select').find((e) => e.name === 'site')?.path, ['Autre', 'Agricole', 'Stockage']);
   assert.deepEqual(ev('select').find((e) => e.name === 'production')?.path, ['Photovoltaïque avec protection DC']);
   assert.equal(field('puissanceInstallee'), '99.5');
-  assert.deepEqual(ev('radio'), [{ type: 'radio', index: 0 }]);
+  assert.equal(ev('radio').length, 1);
+  assert.equal(ev('radio')[0].index, 0);
   assert.equal(ev('check').filter((e) => e.name === 'statutRapport').length, 1);
   assert.equal(ev('file')[0].name, 'dre.pdf');
   assert.equal(field('nomAttestation'), 'PV001 - Consuel');

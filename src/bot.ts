@@ -180,6 +180,7 @@ export async function runJob(job: Job): Promise<RunResult> {
         if (address.numRue) await fillField(p, 'numRue', address.numRue);
         await fillField(p, 'nomRue', address.nomRue);
         await settle(p);
+        await p.waitForTimeout(1_000);
         await p.locator('.geolocalization-validation-container').first().click();
         await settle(p);
         await clickEnabledByText(p, 'Étape suivante');
