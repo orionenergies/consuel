@@ -177,10 +177,7 @@ export async function runJob(job: Job): Promise<RunResult> {
         await fillField(p, 'nomRue', address.nomRue);
         await fillField(p, 'codePostal', address.codePostal);
         await settle(p);
-        await chooseOption(p, p.locator('[formcontrolname="ville"]').first(), [address.ville], {
-          fallbackIfSingle: true,
-          attempts: 4,
-        });
+        await chooseVille(p, address.ville, address.codePostal);
         await settle(p);
         await p.locator('.geolocalization-validation-container').first().click();
         await settle(p);
@@ -307,6 +304,50 @@ async function clickAttestationPlus(page: Page, hybrid: boolean): Promise<void> 
   const target = (await native.count()) > 0 ? native.first() : plus;
   await target.scrollIntoViewIfNeeded();
   await target.dispatchEvent('click');
+}
+
+/**
+ * Choisit la commune dans l'ion-select-popover ouvert par le champ ville.
+ * L'ion-item affiche le nom en majuscules suivi du code postal : « MONTPELLIER (34000) ».
+ */
+async function chooseVille(page: Page, ville: string, codePostal: string): Promise<void> {
+  const control = page.locator('[formcontrolname="ville"]').first();
+  await control.waitFor({ state: 'visible' });
+  const label = `${ville.toLocaleUpperCase('fr-FR')} (${codePostal})`;
+  const wanted = `${norm(ville)} (${codePostal})`;
+  const items = page.locator('ion-select-popover ion-item').filter({ visible: true });
+  let lastTexts: string[] = [];
+
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    await control.click();
+    const deadline = Date.now() + 8_000;
+    let stable = '';
+    while (Date.now() < deadline) {
+      const count = await items.count();
+      const texts: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const text = (await items.nth(i).innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+        texts.push(text);
+        if (norm(text).includes(wanted)) {
+          logger.info('Commune choisie', { text });
+          await items.nth(i).click();
+          return;
+        }
+      }
+      const signature = texts.join('\n');
+      if (texts.length > 0 && signature === stable) {
+        lastTexts = texts;
+        break;
+      }
+      stable = signature;
+      await page.waitForTimeout(250);
+    }
+    logger.warn('Option introuvable, nouvelle tentative', { label, attempt, disponibles: lastTexts.slice(0, 30) });
+    await page.keyboard.press('Escape').catch(() => undefined);
+    await page.waitForTimeout(500);
+  }
+
+  throw new Error(`Option introuvable : ${label} (disponibles : ${lastTexts.slice(0, 30).join(' | ') || 'aucune'})`);
 }
 
 /** Index de la ligne de la liste correspondant au plantCode (sinon la première). */

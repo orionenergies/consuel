@@ -118,7 +118,12 @@ const views = {
     inputs(['nomSite','proprietaireName','numAffaire','numRue','nomRue','codePostal']);
     document.querySelector('[formcontrolname=ville]').addEventListener('click', () => {
       const cp = state.fields.codePostal;
-      setTimeout(() => openPopover(document.querySelector('[formcontrolname=ville]'), 'ville', [['AIX EN PROVENCE','MONTPELLIER','CASTELNAU-LE-LEZ']]), 100);
+      setTimeout(() => openPopover(document.querySelector('[formcontrolname=ville]'), 'ville', [[
+        'MONTPELLIER (34170)',
+        'AIX EN PROVENCE (13100)',
+        'MONTPELLIER (34000)',
+        'CASTELNAU-LE-LEZ (34170)',
+      ]]), 100);
     });
     document.querySelector('.geolocalization-validation-container').addEventListener('click', () => log('geoloc', {}));
     document.querySelector('ion-button').addEventListener('click', () => go('create'));

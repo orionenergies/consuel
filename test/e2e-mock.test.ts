@@ -51,7 +51,7 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
   assert.equal(field('numRue'), '12 bis');
   assert.equal(field('nomRue'), 'rue des Lilas');
   assert.equal(field('codePostal'), '34000');
-  assert.deepEqual(ev('select').find((e) => e.name === 'ville')?.path, ['MONTPELLIER']);
+  assert.deepEqual(ev('select').find((e) => e.name === 'ville')?.path, ['MONTPELLIER (34000)']);
   assert.equal(ev('geoloc').length, 1);
   assert.equal(ev('create').length, 1);
   assert.match(String(ev('open')[0].row), /PV001/);
