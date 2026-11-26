@@ -36,8 +36,7 @@ function openPopover(host, name, levels, onDone, tag){
     const pop = document.createElement(tag);
     levels[lvl].forEach(label => {
       const it = document.createElement('ion-item');
-      it.textContent = label;
-      it.addEventListener('click', () => {
+      const choose = () => {
         (state.selects[name] ||= []).push(label);
         if (lvl + 1 < levels.length) show(lvl + 1);
         else {
@@ -46,7 +45,19 @@ function openPopover(host, name, levels, onDone, tag){
           log('select', {name, path: state.selects[name]});
           onDone && onDone();
         }
-      });
+      };
+      if (tag === 'ion-select-popover') {
+        it.className = 'select-interface-option';
+        const lab = document.createElement('ion-label');
+        lab.textContent = ' ' + label + ' ';
+        const radio = document.createElement('ion-radio');
+        radio.setAttribute('role', 'radio');
+        it.append(lab, radio);
+        radio.addEventListener('click', choose);
+      } else {
+        it.textContent = label;
+        it.addEventListener('click', choose);
+      }
       pop.appendChild(it);
     });
     document.body.appendChild(pop);
@@ -126,6 +137,7 @@ const views = {
     document.querySelector('[formcontrolname=ville]').addEventListener('click', () => {
       const cp = state.fields.codePostal;
       setTimeout(() => openPopover(document.querySelector('[formcontrolname=ville]'), 'ville', [[
+        'MONTPELLIER LES BAINS (34000)',
         'MONTPELLIER (34170)',
         'AIX EN PROVENCE (13100)',
         'MONTPELLIER (34000)',
