@@ -82,17 +82,32 @@ const views = {
     bindBtn('.creer_dossier', () => go('type'));
   },
   type(){
-    h('<div class="consuel-attestation-bleu"><button type="button" class="24-plus">+</button></div>'
-    + '<div class="consuel-attestation-violet"><button type="button" class="24-plus">+</button></div>'
+    const col = (color) => '<ion-col class="consuel-attestation-'+color+' md hydrated">'
+      + '<div class="ion-text-center"><ion-input><input type="text" maxlength="3" value="0"></ion-input></div>'
+      + '<ion-buttons>'
+      + '<ion-button class="button-has-icon-only"><ion-icon slot="icon-only" name="24-moins" aria-label="24 moins" role="img"></ion-icon></ion-button>'
+      + '<ion-button class="button-has-icon-only"><ion-icon slot="icon-only" name="24-plus" aria-label="24 plus" role="img"></ion-icon></ion-button>'
+      + '</ion-buttons></ion-col>';
+    h(col('bleu') + col('violet')
     + '<ion-button disabled aria-disabled="true" class="button-disabled"><span>Étape suivante</span></ion-button>');
-    const next = document.querySelector('ion-button');
-    document.querySelectorAll('[class~="24-plus"]').forEach(e => e.addEventListener('click', () => {
-      hybrid = e.parentElement.className.includes('violet');
-      log('type', {hybrid});
-      next.removeAttribute('disabled');
-      next.setAttribute('aria-disabled', 'false');
-      next.classList.remove('button-disabled');
-    }));
+    const next = document.querySelector('ion-button.button-disabled');
+    document.querySelectorAll('ion-col').forEach(column => {
+      const icon = column.querySelector('ion-icon[name="24-plus"]');
+      const host = icon.closest('ion-button');
+      icon.addEventListener('click', (ev) => ev.stopPropagation());
+      const shadow = host.attachShadow({ mode: 'open' });
+      const native = document.createElement('button');
+      native.type = 'button';
+      native.appendChild(document.createElement('slot')).name = 'icon-only';
+      shadow.appendChild(native);
+      native.addEventListener('click', () => {
+        hybrid = column.className.includes('violet');
+        log('type', {hybrid});
+        next.removeAttribute('disabled');
+        next.setAttribute('aria-disabled', 'false');
+        next.classList.remove('button-disabled');
+      });
+    });
     next.addEventListener('click', () => { if (!next.hasAttribute('disabled')) go('site'); });
   },
   site(){
