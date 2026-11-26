@@ -203,7 +203,9 @@ export async function chooseOption(
   let lastTexts: string[] = [];
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    await control.click();
+    const native = tag === 'ion-select' ? control.locator('button') : null;
+    if (native && (await native.count()) > 0) await native.first().click();
+    else await control.click();
 
     let ok = true;
     for (let level = 0; level < path.length; level++) {

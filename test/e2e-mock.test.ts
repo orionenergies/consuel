@@ -64,13 +64,15 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
   assert.equal(ev('create').length, 1);
   assert.match(String(ev('open')[0].row), /PV001/);
   assert.deepEqual(ev('select').find((e) => e.name === 'typologie')?.path, ['Bâtiment existant']);
-  assert.deepEqual(ev('select').find((e) => e.name === 'site')?.path, ['Autre', 'Agricole', 'Stockage']);
+  assert.deepEqual(ev('select').find((e) => e.name === 'site')?.path, ['Autre', 'Agricole', 'Stockage - Entrepot']);
   assert.deepEqual(ev('select').find((e) => e.name === 'production')?.path, ['Photovoltaïque avec protection DC']);
   assert.equal(field('puissanceInstallee'), '99.5');
   assert.equal(ev('radio').length, 1);
   assert.equal(ev('radio')[0].index, 0);
   assert.equal(ev('check').filter((e) => e.name === 'statutRapport').length, 1);
   assert.equal(ev('file')[0].name, 'dre.pdf');
+  const toggleAt = Number(ev('check').find((e) => e.name === 'statutRapport')?.at);
+  assert.ok(Number(ev('file')[0].at) - toggleAt >= 500);
   assert.equal(field('nomAttestation'), 'PV001 - Consuel');
   assert.equal(ev('save').length, 1);
   assert.deepEqual(ev('check').filter((e) => e.name === 'row1' && e.checked).length, 1);
