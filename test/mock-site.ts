@@ -36,8 +36,7 @@ function openPopover(host, name, levels, onDone, tag){
     const pop = document.createElement(tag);
     levels[lvl].forEach(label => {
       const it = document.createElement('ion-item');
-      it.textContent = label;
-      it.addEventListener('click', () => {
+      const choose = () => {
         (state.selects[name] ||= []).push(label);
         if (lvl + 1 < levels.length) show(lvl + 1);
         else {
@@ -46,7 +45,20 @@ function openPopover(host, name, levels, onDone, tag){
           log('select', {name, path: state.selects[name]});
           onDone && onDone();
         }
-      });
+      };
+      if (tag === 'ion-select-popover') {
+        it.className = 'select-interface-option';
+        const lab = document.createElement('ion-label');
+        lab.textContent = ' ' + label + ' ';
+        const radio = document.createElement('ion-radio');
+        radio.setAttribute('role', 'radio');
+        it.append(lab, radio);
+        radio.addEventListener('click', (ev) => ev.stopPropagation());
+        it.addEventListener('click', choose);
+      } else {
+        it.textContent = label;
+        it.addEventListener('click', choose);
+      }
       pop.appendChild(it);
     });
     document.body.appendChild(pop);
@@ -119,18 +131,26 @@ const views = {
   },
   site(){
     h(['nomSite','proprietaireName','numAffaire','numRue','nomRue','codePostal'].map(n => '<ion-input formcontrolname="'+n+'"><input type="text"></ion-input>').join('')
-    + '<div formcontrolname="ville">Choisir</div>'
+    + '<ion-select formcontrolname="ville" aria-label="Choisissez votre ville">Choisir</ion-select>'
     + '<div class="geolocalization-validation-container">Valider la géolocalisation</div>'
     + '<ion-button><span>Étape suivante</span></ion-button>');
     inputs(['nomSite','proprietaireName','numAffaire','numRue','nomRue','codePostal']);
-    document.querySelector('[formcontrolname=ville]').addEventListener('click', () => {
-      const cp = state.fields.codePostal;
-      setTimeout(() => openPopover(document.querySelector('[formcontrolname=ville]'), 'ville', [[
-        'MONTPELLIER (34170)',
-        'AIX EN PROVENCE (13100)',
-        'MONTPELLIER (34000)',
-        'CASTELNAU-LE-LEZ (34170)',
-      ]]), 100);
+    const ville = document.querySelector('[aria-label="Choisissez votre ville"]');
+    const openVille = () => openPopover(ville, 'ville', [[
+      'MONTPELLIER LES BAINS (34000)',
+      'MONTPELLIER (34170)',
+      'AIX EN PROVENCE (13100)',
+      'MONTPELLIER (34000)',
+      'CASTELNAU-LE-LEZ (34170)',
+    ]]);
+    document.querySelector('[formcontrolname=codePostal] input').addEventListener('blur', () => {
+      setTimeout(() => { if (!document.querySelector('ion-select-popover')) openVille(); }, 150);
+    });
+    ville.addEventListener('click', () => {
+      log('ville-click', {});
+      const existing = document.querySelector('ion-select-popover');
+      if (existing) existing.remove();
+      else openVille();
     });
     document.querySelector('.geolocalization-validation-container').addEventListener('click', () => log('geoloc', {}));
     document.querySelector('ion-button').addEventListener('click', () => go('create'));

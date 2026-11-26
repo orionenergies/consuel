@@ -344,42 +344,81 @@ async function importInspectionFile(page: Page, filePath: string): Promise<void>
   throw new Error("Import du DRE impossible : la zone .import-multiple-file-container n'a pas ouvert de fichier");
 }
 
+/** « Feurs » + 42110 correspond au libellé exact « FEURS (42110) », pas à un nom qui le contient. */
+function villeLabelPattern(ville: string, codePostal: string): RegExp {
+  const folded = ville.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const words = folded
+    .split(/[^0-9A-Za-z]+/)
+    .filter(Boolean)
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^\\s*${words.join('\\s+')}\\s*\\(\\s*${codePostal}\\s*\\)\\s*$`, 'i');
+}
+
 /**
- * Choisit la commune dans l'ion-select-popover ouvert par le champ ville.
- * L'ion-item affiche le nom en majuscules suivi du code postal : « MONTPELLIER (34000) ».
+ * Choisit la commune dans l'ion-select-popover du champ ville.
+ * La liste s'ouvre souvent d'elle-même après le code postal : on ne clique
+ * « Choisissez votre ville » que si elle est absente, sinon ce clic la referme.
+ * Le libellé est dans ion-label (« FEURS (42110) ») et le clic porte sur toute la ligne ion-item.
+ * La liste peut n'afficher qu'une fenêtre : on la fait défiler tant que de nouvelles communes apparaissent.
  */
 async function chooseVille(page: Page, ville: string, codePostal: string): Promise<void> {
-  const control = page.locator('[formcontrolname="ville"]').first();
-  await control.waitFor({ state: 'visible' });
   const label = `${ville.toLocaleUpperCase('fr-FR')} (${codePostal})`;
-  const wanted = `${norm(ville)} (${codePostal})`;
-  const items = page.locator('ion-select-popover ion-item').filter({ visible: true });
+  const pattern = villeLabelPattern(ville, codePostal);
   let lastTexts: string[] = [];
 
   for (let attempt = 1; attempt <= 4; attempt++) {
-    await control.click();
-    const deadline = Date.now() + 8_000;
-    let stable = '';
-    while (Date.now() < deadline) {
-      const count = await items.count();
-      const texts: string[] = [];
-      for (let i = 0; i < count; i++) {
-        const text = (await items.nth(i).innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
-        texts.push(text);
-        if (norm(text).includes(wanted)) {
-          logger.info('Commune choisie', { text });
-          await items.nth(i).click();
-          return;
-        }
-      }
-      const signature = texts.join('\n');
-      if (texts.length > 0 && signature === stable) {
-        lastTexts = texts;
-        break;
-      }
-      stable = signature;
-      await page.waitForTimeout(250);
+    const popover = page.locator('ion-select-popover').last();
+    let opened = await popover.isVisible().catch(() => false);
+    if (!opened) {
+      opened = await popover
+        .waitFor({ state: 'visible', timeout: attempt === 1 ? 3_000 : 1_000 })
+        .then(() => true)
+        .catch(() => false);
     }
+    if (!opened) {
+      const control = page.locator('[aria-label="Choisissez votre ville"]').first();
+      await control.waitFor({ state: 'visible', timeout: 5_000 });
+      await control.click();
+      opened = await popover
+        .waitFor({ state: 'visible', timeout: 8_000 })
+        .then(() => true)
+        .catch(() => false);
+    }
+    if (!opened) {
+      logger.warn('Option introuvable, nouvelle tentative', { label, attempt, disponibles: [] });
+      continue;
+    }
+
+    const deadline = Date.now() + 8_000;
+    let signature = '';
+    let stagnant = 0;
+    while (Date.now() < deadline) {
+      const match = popover.locator('ion-label').filter({ hasText: pattern }).first();
+      if ((await match.count()) > 0) {
+        const text = (await match.innerText()).replace(/\s+/g, ' ').trim();
+        const item = match.locator('xpath=ancestor::ion-item[1]');
+        logger.info('Commune choisie', { text });
+        await item.click();
+        return;
+      }
+
+      const texts = (await popover.locator('ion-label').allInnerTexts())
+        .map((t) => t.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+      if (texts.length > 0) lastTexts = texts;
+      const next = texts.join('\n');
+      stagnant = next.length > 0 && next === signature ? stagnant + 1 : 0;
+      signature = next;
+      if (stagnant >= 1) break;
+      await popover.evaluate((el) => {
+        const scroller = el.classList.contains('popover-viewport')
+          ? el
+          : ((el.querySelector('.popover-viewport') as HTMLElement | null) ?? el);
+        scroller.scrollTop += Math.max(scroller.clientHeight - 24, 40);
+      });
+      await page.waitForTimeout(200);
+    }
+
     logger.warn('Option introuvable, nouvelle tentative', { label, attempt, disponibles: lastTexts.slice(0, 30) });
     await page.keyboard.press('Escape').catch(() => undefined);
     await page.waitForTimeout(500);
