@@ -49,7 +49,7 @@ Requête `POST /run` avec un corps JSON :
 1. Connexion (`identifiant`, `password`, bouton `.connexion`), la bannière cookies est refusée si elle apparaît
 2. Clic sur `.creer_dossier`
 3. Clic sur le « + » de `.consuel-attestation-violet` (projet hybride) ou `.consuel-attestation-bleu` : l'`ion-button` qui contient `ion-icon[name="24-plus"][aria-label="24 plus"]` (le bouton « − » voisin, `24-moins`, est ignoré). « Étape suivante » n'est cliqué qu'une fois actif : il est visible mais désactivé avant ce « + »
-4. Formulaire du site (`nomSite`, `proprietaireName`, `numAffaire`, `numRue`, `nomRue`, `codePostal`). Le champ `ville` ouvre un `ion-select-popover` : clic sur l'`ion-item` qui contient la commune en majuscules et le code postal, par exemple `MONTPELLIER (34000)`. Puis `.geolocalization-validation-container` et « Étape suivante »
+4. Formulaire du site : `nomSite`, `proprietaireName`, `numAffaire`, puis `codePostal`. Le champ `ville` ouvre un `ion-select-popover` : clic sur l'`ion-item` qui contient la commune en majuscules et le code postal, par exemple `MONTPELLIER (34000)`. Ensuite seulement `numRue` et `nomRue`, pour que le pointeur de la carte se place. Une seconde d'attente, puis `.geolocalization-validation-container` et « Étape suivante »
 5. « Créer le dossier »
 6. « Mes attestations à envoyer »
 7. Ouverture de la ligne `.pagination-liste-element--ligne` (celle qui contient le `plantCode`, sinon la première)
