@@ -203,9 +203,14 @@ export async function chooseOption(
   let lastTexts: string[] = [];
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const native = tag === 'ion-select' ? control.locator('button') : null;
-    if (native && (await native.count()) > 0) await native.first().click();
-    else await control.click();
+    // ion-select#typologieTypeId est lui-même le bouton (role="button").
+    // Son bouton interne est recouvert par un label : un clic de pointeur n'arrive pas.
+    if (tag === 'ion-select') {
+      const expanded = ((await control.getAttribute('class')) ?? '').includes('select-expanded');
+      if (!expanded) await control.dispatchEvent('click');
+    } else {
+      await control.click();
+    }
 
     let ok = true;
     for (let level = 0; level < path.length; level++) {
