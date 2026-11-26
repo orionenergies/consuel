@@ -17,7 +17,6 @@ import {
   looseRegex,
   norm,
   settle,
-  uploadFile,
 } from './ionic';
 import * as logger from './logger';
 import type { Job } from './schema';
@@ -207,17 +206,24 @@ export async function runJob(job: Job): Promise<RunResult> {
       });
 
       await step('8. Formulaire de l\'attestation', async () => {
-        await chooseOption(p, p.locator('#typologieTypeId'), [typologieFor(job.projectType)]);
-        await chooseOption(p, p.locator('#selectedSiteId'), ['Autre', 'Agricole', 'Stockage']);
+        await chooseOption(p, await selectControl(p, 'typologieTypeId'), [typologieFor(job.projectType)]);
+        await chooseOption(p, await selectControl(p, 'selectedSiteId', 'app-select-multilevel'), [
+          'Autre',
+          'Agricole',
+          'Stockage - Entrepot',
+        ]);
         await settle(p);
-        await chooseOption(p, p.locator('#typeProductionIdId'), ['LAST']);
+        await chooseOption(p, await selectControl(p, 'typeProductionIdId'), ['Photovoltaïque avec protection DC']);
         await settle(p);
 
         const powerType = await fieldInputType(p, 'puissanceInstallee');
         await fillField(p, 'puissanceInstallee', formatPower(job.injectedPower, powerType));
-        await checkControl(p.locator('[formcontrolname="isTensionSubMille"]').first(), 0);
-        await checkControl(p.locator('[formcontrolname="statutRapportOrganismeInspection"]').first(), 0);
-        await uploadFile(p, p.locator('[formarrayname="rapportOrganismeInspection"]').first(), dre.filePath);
+        await p.locator('ion-item').filter({ hasText: looseRegex('Inférieure ou égale') }).first().click();
+        const toggle = p.locator('ion-toggle[formcontrolname="statutRapportOrganismeInspection"]').first();
+        await toggle.waitFor({ state: 'visible' });
+        if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+        await p.waitForTimeout(500);
+        await importInspectionFile(p, dre.filePath);
         await settle(p, 60_000);
         await fillField(p, 'nomAttestation', `${job.plantCode} - Consuel`);
         await clickByText(p, /^\s*enregistrer\s*$/i);
@@ -306,6 +312,36 @@ async function clickAttestationPlus(page: Page, hybrid: boolean): Promise<void> 
   const target = (await native.count()) > 0 ? native.first() : plus;
   await target.scrollIntoViewIfNeeded();
   await target.dispatchEvent('click');
+}
+
+/** ion-select, ou app-select-multilevel, identifié par son id (éventuellement sur un parent). */
+async function selectControl(page: Page, id: string, tag = 'ion-select'): Promise<Locator> {
+  const byId = page.locator(`#${id}`).first();
+  await byId.waitFor({ state: 'visible' });
+  const hostTag = await byId.evaluate((el) => el.tagName.toLowerCase());
+  if (hostTag === tag) return byId;
+  const inner = byId.locator(tag).first();
+  if ((await inner.count()) > 0) return inner;
+  return byId;
+}
+
+/** Importe le DRE via la zone qui apparaît après l'interrupteur du rapport. */
+async function importInspectionFile(page: Page, filePath: string): Promise<void> {
+  const zone = page.locator('.import-multiple-file-container').first();
+  await zone.waitFor({ state: 'visible', timeout: 15_000 });
+  const chooserPromise = page.waitForEvent('filechooser', { timeout: 1_500 }).catch(() => null);
+  await zone.click();
+  const chooser = await chooserPromise;
+  if (chooser) {
+    await chooser.setFiles(filePath);
+    return;
+  }
+  const input = zone.locator('input[type="file"]');
+  if ((await input.count()) > 0) {
+    await input.setInputFiles(filePath);
+    return;
+  }
+  throw new Error("Import du DRE impossible : la zone .import-multiple-file-container n'a pas ouvert de fichier");
 }
 
 /**

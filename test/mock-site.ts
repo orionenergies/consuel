@@ -18,7 +18,7 @@ const PAGE = /* html */ `<!doctype html><html><head><meta charset="utf-8"><title
   ion-item{display:block;padding:4px;cursor:pointer}
   ion-radio,ion-checkbox{display:inline-block;width:20px;height:20px;border:1px solid #000;margin:4px;vertical-align:middle}
   .radio-checked,.checkbox-checked{background:#080}
-  [formcontrolname=ville],#typologieTypeId,#selectedSiteId,#typeProductionIdId{display:block;border:1px solid #999;min-height:24px;min-width:200px;cursor:pointer;margin:4px}
+  [formcontrolname=ville],#typologieTypeId,#selectedSiteId,#typeProductionIdId,ion-toggle,.import-multiple-file-container{display:block;border:1px solid #999;min-height:24px;min-width:200px;cursor:pointer;margin:4px}
 </style></head><body><div id="app"></div>
 <script>
 const app = document.getElementById('app');
@@ -29,23 +29,30 @@ let hybrid = false;
 function h(html){ app.innerHTML = html; }
 function bindBtn(sel, fn){ const e = document.querySelector(sel); if (e) e.addEventListener('click', fn); }
 
-function openPopover(host, name, levels, onDone){
-  document.querySelectorAll('ion-select-popover').forEach(e => e.remove());
-  const pop = document.createElement('ion-select-popover');
-  const render = (lvl) => {
-    pop.innerHTML = '';
+function openPopover(host, name, levels, onDone, tag){
+  tag = tag || 'ion-select-popover';
+  const show = (lvl) => {
+    document.querySelectorAll(tag).forEach(e => e.remove());
+    const pop = document.createElement(tag);
     levels[lvl].forEach(label => {
-      const it = document.createElement('ion-item'); it.textContent = label;
+      const it = document.createElement('ion-item');
+      it.textContent = label;
       it.addEventListener('click', () => {
         (state.selects[name] ||= []).push(label);
-        if (lvl + 1 < levels.length) render(lvl + 1);
-        else { pop.remove(); host.textContent = label; log('select', {name, path: state.selects[name]}); onDone && onDone(); }
+        if (lvl + 1 < levels.length) show(lvl + 1);
+        else {
+          pop.remove();
+          host.textContent = label;
+          log('select', {name, path: state.selects[name]});
+          onDone && onDone();
+        }
       });
       pop.appendChild(it);
     });
+    document.body.appendChild(pop);
   };
   state.selects[name] = [];
-  render(0); document.body.appendChild(pop);
+  show(0);
 }
 
 function checkbox(el, name){
@@ -145,21 +152,38 @@ const views = {
     document.querySelector('.envoyer').addEventListener('click', () => { log('envoyer', {}); go('confirm'); });
   },
   form(){
-    h('<div id="typologieTypeId">-</div><div id="selectedSiteId">-</div><div id="typeProductionIdId">-</div>'
+    h('<ion-select id="typologieTypeId">Choisir</ion-select>'
+    + '<app-select-multilevel id="selectedSiteId">Choisir</app-select-multilevel>'
+    + '<ion-select id="typeProductionIdId">Choisir</ion-select>'
     + '<ion-input formcontrolname="puissanceInstallee"><input type="number"></ion-input>'
-    + '<div formcontrolname="isTensionSubMille"><ion-radio></ion-radio> &lt;= 1000V <ion-radio></ion-radio> &gt; 1000V</div>'
-    + '<ion-checkbox formcontrolname="statutRapportOrganismeInspection"></ion-checkbox>'
-    + '<div formarrayname="rapportOrganismeInspection"><input type="file" style="display:none"><span>Importer</span></div>'
+    + '<ion-item class="tension"><ion-radio></ion-radio> Inférieure ou égale à 1000 V</ion-item>'
+    + '<ion-item class="tension"><ion-radio></ion-radio> Supérieure à 1000 V</ion-item>'
+    + '<ion-toggle formcontrolname="statutRapportOrganismeInspection" aria-checked="false"></ion-toggle>'
+    + '<div class="import-multiple-file-container" style="display:none">Importer<input type="file"></div>'
     + '<ion-input formcontrolname="nomAttestation"><input type="text"></ion-input>'
     + '<ion-button class="save"><span>Enregistrer</span></ion-button>');
-    const sel = (id, name, levels) => document.getElementById(id).addEventListener('click', () => openPopover(document.getElementById(id), name, levels));
-    sel('typologieTypeId','typologie',[['Bâtiment neuf','Bâtiment existant','Sans bâtiment']]);
-    sel('selectedSiteId','site',[['Sol','Autre','Toiture'],['Industriel','Agricole'],['Serre','Stockage']]);
-    sel('typeProductionIdId','production',[['Photovoltaïque','Photovoltaïque avec stockage','Photovoltaïque avec protection DC']]);
+    const sel = (id, name, levels, tag) => document.getElementById(id).addEventListener('click', () => openPopover(document.getElementById(id), name, levels, null, tag));
+    sel('typologieTypeId','typologie',[['Bâtiment neuf','Bâtiment existant','Sans bâtiment']],'ion-popover');
+    sel('selectedSiteId','site',[['Sol','Autre','Toiture'],['Industriel','Agricole'],['Serre','Stockage - Entrepot']],'ion-popover');
+    sel('typeProductionIdId','production',[['Photovoltaïque','Photovoltaïque avec stockage','Photovoltaïque avec protection DC']],'ion-popover');
     inputs(['puissanceInstallee','nomAttestation']);
-    document.querySelectorAll('[formcontrolname=isTensionSubMille] ion-radio').forEach((r,i) => r.addEventListener('click', () => { r.checked = true; r.classList.add('radio-checked'); log('radio', {index:i}); }));
-    checkbox(document.querySelector('[formcontrolname=statutRapportOrganismeInspection]'), 'statutRapport');
-    document.querySelector('input[type=file]').addEventListener('change', e => log('file', {name: e.target.files[0].name, size: e.target.files[0].size}));
+    document.querySelectorAll('ion-item.tension').forEach((item, i) => {
+      item.querySelector('ion-radio').addEventListener('click', (ev) => ev.stopPropagation());
+      item.addEventListener('click', () => log('radio', {index: i}));
+    });
+    const zone = document.querySelector('.import-multiple-file-container');
+    let importArmed = false;
+    document.querySelector('ion-toggle').addEventListener('click', () => {
+      const toggle = document.querySelector('ion-toggle');
+      toggle.setAttribute('aria-checked', 'true');
+      zone.style.display = 'block';
+      log('check', {name: 'statutRapport', checked: true});
+    });
+    zone.addEventListener('click', () => { importArmed = true; });
+    zone.querySelector('input').addEventListener('change', (e) => {
+      if (!importArmed || !e.target.files[0]) return;
+      log('file', {name: e.target.files[0].name, size: e.target.files[0].size});
+    });
     document.querySelector('.save').addEventListener('click', () => { state.edited = true; log('save', {}); go('list'); });
   },
   confirm(){
