@@ -48,7 +48,7 @@ Requête `POST /run` avec un corps JSON :
 
 1. Connexion (`identifiant`, `password`, bouton `.connexion`), la bannière cookies est refusée si elle apparaît
 2. Clic sur `.creer_dossier`
-3. Clic sur `.24-plus` dans `.consuel-attestation-violet` (projet hybride) ou `.consuel-attestation-bleu`, puis « Étape suivante »
+3. Clic sur le « + » de `.consuel-attestation-violet` (projet hybride) ou `.consuel-attestation-bleu` : l'`ion-button` qui contient `ion-icon[name="24-plus"][aria-label="24 plus"]` (le bouton « − » voisin, `24-moins`, est ignoré). « Étape suivante » n'est cliqué qu'une fois actif : il est visible mais désactivé avant ce « + »
 4. Formulaire du site (`nomSite`, `proprietaireName`, `numAffaire`, `numRue`, `nomRue`, `codePostal`, `ville` choisie dans la liste selon la commune), `.geolocalization-validation-container`, « Étape suivante »
 5. « Créer le dossier »
 6. « Mes attestations à envoyer »

@@ -10,6 +10,7 @@ import {
   checkControl,
   chooseOption,
   clickByText,
+  clickEnabledByText,
   dismissCookieBanner,
   fieldInputType,
   fillField,
@@ -163,13 +164,8 @@ export async function runJob(job: Job): Promise<RunResult> {
       });
 
       await step('3. Type d\'attestation', async () => {
-        const cls = isHybrid(job.projectType) ? 'consuel-attestation-violet' : 'consuel-attestation-bleu';
-        const nested = p.locator(`.${cls} [class~="24-plus"], .${cls}[class~="24-plus"]`).first();
-        const card = p.locator(`.${cls}`).first();
-        await card.waitFor({ state: 'visible' });
-        if ((await nested.count()) > 0) await nested.click();
-        else await card.click();
-        await clickByText(p, 'Étape suivante');
+        await clickAttestationPlus(p, isHybrid(job.projectType));
+        await clickEnabledByText(p, 'Étape suivante');
         await settle(p);
       });
 
@@ -188,7 +184,7 @@ export async function runJob(job: Job): Promise<RunResult> {
         await settle(p);
         await p.locator('.geolocalization-validation-container').first().click();
         await settle(p);
-        await clickByText(p, 'Étape suivante');
+        await clickEnabledByText(p, 'Étape suivante');
         await settle(p);
       });
 
@@ -287,6 +283,30 @@ export async function runJob(job: Job): Promise<RunResult> {
     await browser?.close().catch(() => undefined);
     await dre.cleanup().catch(() => undefined);
   }
+}
+
+/**
+ * Clique le « + » de la carte violette (hybride) ou bleue.
+ * Le bouton est l'ion-button qui contient ion-icon[name="24-plus"][aria-label="24 plus"].
+ * L'icône ne reçoit pas le pointeur : le clic doit partir du bouton (bouton natif du shadow DOM).
+ * « Étape suivante » est déjà visible, mais il reste désactivé tant que ce « + » n'a pas été cliqué.
+ */
+async function clickAttestationPlus(page: Page, hybrid: boolean): Promise<void> {
+  const zone = hybrid ? 'violette' : 'bleue';
+  const cls = hybrid ? 'consuel-attestation-violet' : 'consuel-attestation-bleu';
+  const card = page.locator(`.${cls}`).first();
+  await card.waitFor({ state: 'visible' });
+  const plus = card.locator('ion-button:has(ion-icon[name="24-plus"][aria-label="24 plus"])').first();
+  try {
+    await plus.waitFor({ state: 'visible', timeout: 15_000 });
+  } catch {
+    throw new Error(`Bouton + introuvable dans la zone ${zone}`);
+  }
+  logger.info(`Clic sur + dans la zone ${zone}`);
+  const native = plus.locator('button');
+  const target = (await native.count()) > 0 ? native.first() : plus;
+  await target.scrollIntoViewIfNeeded();
+  await target.dispatchEvent('click');
 }
 
 /** Index de la ligne de la liste correspondant au plantCode (sinon la première). */
