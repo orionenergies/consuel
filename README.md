@@ -53,7 +53,7 @@ Requête `POST /run` avec un corps JSON :
 5. « Créer le dossier »
 6. « Mes attestations à envoyer »
 7. Ouverture de la ligne `.pagination-liste-element--ligne` (celle qui contient le `plantCode`, sinon la première)
-8. Formulaire de l'attestation, dans cet ordre : `ion-select#typologieTypeId` (`role="button"`, les `ion-select-option` sont Bâtiment neuf, Bâtiment existant, Sans bâtiment), `app-select-multilevel#selectedSiteId` (Autre, puis Agricole, puis « Stockage - Entrepot »), `ion-select#typeProductionIdId` (« Photovoltaïque avec protection DC »), `puissanceInstallee`, ligne `ion-item` « Inférieure ou égale », `ion-toggle[formcontrolname=statutRapportOrganismeInspection]`, puis 0,5 s et clic sur `.import-multiple-file-container` pour le DRE, `nomAttestation`, « Enregistrer »
+8. Formulaire de l'attestation, dans cet ordre : `ion-select#typologieTypeId` (`role="button"`, options Bâtiment neuf, Bâtiment existant, Sans bâtiment), puis `app-select-multilevel#selectedSiteId`. Chaque niveau est une ligne `ion-item.ion-item-select` : Autre, puis Agricole, puis « Stockage – Entrepôt (silos céréales…) ». Les sous-listes dans `.overlay-hidden` sont ignorées. Ensuite `ion-select#typeProductionIdId` et la ligne « Photovoltaïque avec protection DC », `puissanceInstallee`, ligne `ion-item` « Inférieure ou égale », `ion-toggle[formcontrolname=statutRapportOrganismeInspection]`, puis 0,5 s et clic sur `.import-multiple-file-container` pour le DRE, `nomAttestation`, « Enregistrer »
 9. Case `.pagination-liste-element--checkbox` de la ligne, puis `.envoyer`
 10. « Confirmer » puis « Enregistrer »
 11. Case « Je confirme » puis « Signer et envoyer »

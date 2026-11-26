@@ -210,7 +210,7 @@ export async function runJob(job: Job): Promise<RunResult> {
         await chooseOption(p, await selectControl(p, 'selectedSiteId', 'app-select-multilevel'), [
           'Autre',
           'Agricole',
-          'Stockage - Entrepot',
+          'Stockage – Entrepôt',
         ]);
         await settle(p);
         await chooseOption(p, await selectControl(p, 'typeProductionIdId'), ['Photovoltaïque avec protection DC']);
