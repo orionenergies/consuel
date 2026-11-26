@@ -356,24 +356,34 @@ function villeLabelPattern(ville: string, codePostal: string): RegExp {
 
 /**
  * Choisit la commune dans l'ion-select-popover du champ ville.
- * Chaque option est un ion-item.select-interface-option : le texte est dans ion-label
- * (« FEURS (42110) ») et le clic part du ion-radio. La liste peut n'afficher qu'une
- * fenêtre (popover-viewport) : on la fait défiler tant que de nouvelles communes apparaissent.
+ * La liste s'ouvre souvent d'elle-même après le code postal : on ne clique
+ * « Choisissez votre ville » que si elle est absente, sinon ce clic la referme.
+ * Le libellé est dans ion-label (« FEURS (42110) ») et le clic porte sur toute la ligne ion-item.
+ * La liste peut n'afficher qu'une fenêtre : on la fait défiler tant que de nouvelles communes apparaissent.
  */
 async function chooseVille(page: Page, ville: string, codePostal: string): Promise<void> {
-  const control = page.locator('[formcontrolname="ville"]').first();
-  await control.waitFor({ state: 'visible' });
   const label = `${ville.toLocaleUpperCase('fr-FR')} (${codePostal})`;
   const pattern = villeLabelPattern(ville, codePostal);
   let lastTexts: string[] = [];
 
   for (let attempt = 1; attempt <= 4; attempt++) {
-    await control.click();
     const popover = page.locator('ion-select-popover').last();
-    const opened = await popover
-      .waitFor({ state: 'visible', timeout: 8_000 })
-      .then(() => true)
-      .catch(() => false);
+    let opened = await popover.isVisible().catch(() => false);
+    if (!opened) {
+      opened = await popover
+        .waitFor({ state: 'visible', timeout: attempt === 1 ? 3_000 : 1_000 })
+        .then(() => true)
+        .catch(() => false);
+    }
+    if (!opened) {
+      const control = page.locator('[aria-label="Choisissez votre ville"]').first();
+      await control.waitFor({ state: 'visible', timeout: 5_000 });
+      await control.click();
+      opened = await popover
+        .waitFor({ state: 'visible', timeout: 8_000 })
+        .then(() => true)
+        .catch(() => false);
+    }
     if (!opened) {
       logger.warn('Option introuvable, nouvelle tentative', { label, attempt, disponibles: [] });
       continue;
@@ -387,15 +397,8 @@ async function chooseVille(page: Page, ville: string, codePostal: string): Promi
       if ((await match.count()) > 0) {
         const text = (await match.innerText()).replace(/\s+/g, ' ').trim();
         const item = match.locator('xpath=ancestor::ion-item[1]');
-        const radio = item.locator('ion-radio').first();
         logger.info('Commune choisie', { text });
-        if ((await radio.count()) > 0) {
-          const native = radio.locator('button');
-          if ((await native.count()) > 0) await native.first().click();
-          else await radio.click();
-        } else {
-          await item.click();
-        }
+        await item.click();
         return;
       }
 
