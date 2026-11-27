@@ -46,7 +46,7 @@ Requête `POST /run` avec un corps JSON :
 
 ## Workflow automatisé
 
-1. Connexion (`identifiant`, `password`, bouton `.connexion`), la bannière cookies est refusée si elle apparaît
+1. Connexion (`identifiant`, `password`, bouton `.connexion`). Dès que `#axeptio_overlay` est visible, le bot clique « Non merci » (ce n'est pas toujours un bouton). Le même clic se répète plus tard si le calque réapparaît, par exemple au-dessus de « Confirmer »
 2. Clic sur `.creer_dossier`
 3. Clic sur le « + » de `.consuel-attestation-violet` (projet hybride) ou `.consuel-attestation-bleu` : l'`ion-button` qui contient `ion-icon[name="24-plus"][aria-label="24 plus"]` (le bouton « − » voisin, `24-moins`, est ignoré). « Étape suivante » n'est cliqué qu'une fois actif : il est visible mais désactivé avant ce « + »
 4. Formulaire du site : `nomSite`, `proprietaireName`, `numAffaire`, puis `codePostal`. La saisie du code postal ouvre souvent déjà l'`ion-select-popover` : le bot ne clique `aria-label="Choisissez votre ville"` que si cette liste est absente. Le libellé exact est dans `ion-label` (`FEURS (42110)`, espaces et accents ignorés) et le clic porte sur toute la ligne `ion-item`. La liste défile si la commune n'est pas encore affichée. Ensuite seulement `numRue` et `nomRue`, pour que le pointeur de la carte se place. Une seconde d'attente, puis `.geolocalization-validation-container` et « Étape suivante »
@@ -55,7 +55,7 @@ Requête `POST /run` avec un corps JSON :
 7. Ouverture de la ligne `.pagination-liste-element--ligne` (celle qui contient le `plantCode`, sinon la première)
 8. Formulaire de l'attestation, dans cet ordre : `ion-select#typologieTypeId` (`role="button"`, options Bâtiment neuf, Bâtiment existant, Sans bâtiment), puis `app-select-multilevel#selectedSiteId`. Chaque niveau est une ligne `ion-item.ion-item-select` : Autre, puis Agricole, puis « Stockage – Entrepôt (silos céréales…) ». Les sous-listes dans `.overlay-hidden` sont ignorées. Ensuite `ion-select#typeProductionIdId` et la ligne « Photovoltaïque avec protection DC », `puissanceInstallee`, ligne `ion-item` « Inférieure ou égale », `ion-toggle[formcontrolname=statutRapportOrganismeInspection]`, puis 0,5 s et clic sur `.import-multiple-file-container` pour le DRE, `nomAttestation`, « Enregistrer »
 9. Case `.pagination-liste-element--checkbox` de la ligne, puis `.envoyer`
-10. « Confirmer » puis « Enregistrer »
+10. « Confirmer » puis « Enregistrer ». Si `#axeptio_overlay` recouvre encore la page, « Non merci » est cliqué avant « Confirmer »
 11. Case « Je confirme » puis « Signer et envoyer »
 
 Le fichier `src/bot.ts` contient le workflow, et `src/ionic.ts` les fonctions génériques (listes déroulantes Ionic, cases à cocher, upload).

@@ -13,6 +13,7 @@ import {
   clickEnabledByText,
   dismissCookieBanner,
   fieldInputType,
+  watchAxeptioOverlay,
   fillField,
   looseRegex,
   norm,
@@ -131,6 +132,7 @@ export async function runJob(job: Job): Promise<RunResult> {
     page = await context.newPage();
     recording = page.video();
     const p = page;
+    await watchAxeptioOverlay(p);
 
     const timedOut = new Promise<never>((_, reject) => {
       timer = setTimeout(

@@ -1,6 +1,6 @@
-import type { Locator, Page } from 'playwright';
+import type { Frame, FrameLocator, Locator, Page } from 'playwright';
 
-import { warn } from './logger';
+import { info, warn } from './logger';
 
 /** Normalise un libellé pour comparer sans tenir compte de la casse, des accents et de la ponctuation. */
 export const norm = (s: string): string =>
@@ -36,8 +36,52 @@ export async function settle(page: Page, timeout = 15_000): Promise<void> {
     .catch(() => undefined);
 }
 
+const NON_MERCI = /^\s*non merci\s*$/i;
+
+type ClickScope = Page | Frame | FrameLocator | Locator;
+
+async function clickNonMerci(scope: ClickScope): Promise<boolean> {
+  const button = scope.getByRole('button', { name: NON_MERCI }).last();
+  const label = scope.getByText(NON_MERCI).last();
+  for (const target of [button, label]) {
+    if (!(await target.isVisible().catch(() => false))) continue;
+    await target.dispatchEvent('click');
+    info('Bannière Axeptio fermée', { bouton: 'Non merci' });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Ferme le calque cookies dès que `#axeptio_overlay` est visible.
+ * « Non merci » n'est pas toujours un bouton : le clic part de la ligne qui porte ce texte.
+ */
+export async function dismissAxeptioOverlay(page: Page): Promise<boolean> {
+  const overlay = page.locator('#axeptio_overlay').first();
+  if (!(await overlay.isVisible().catch(() => false))) return false;
+  if (await clickNonMerci(overlay)) return true;
+
+  const frames = overlay.locator('iframe');
+  const frameCount = await frames.count().catch(() => 0);
+  for (let i = 0; i < frameCount; i++) {
+    const frame = overlay.frameLocator('iframe').nth(i);
+    if (await clickNonMerci(frame)) return true;
+  }
+
+  warn('Calque axeptio_overlay visible, bouton « Non merci » introuvable');
+  return false;
+}
+
+/** Avant chaque action, ferme Axeptio si son calque recouvre la page. */
+export async function watchAxeptioOverlay(page: Page): Promise<void> {
+  await page.addLocatorHandler(page.locator('#axeptio_overlay'), async () => {
+    await dismissAxeptioOverlay(page);
+  });
+}
+
 /** Ferme la bannière cookies si elle est présente (non bloquant). */
 export async function dismissCookieBanner(page: Page): Promise<void> {
+  if (await dismissAxeptioOverlay(page)) return;
   const btn = page
     .locator('button, ion-button, a')
     .filter({ hasText: /non merci|tout refuser|continuer sans accepter|tout accepter|j'accepte|ok pour moi/i })

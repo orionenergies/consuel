@@ -83,6 +83,7 @@ test('workflow complet sur le faux site', { timeout: 120_000 }, async () => {
   assert.deepEqual(ev('check').filter((e) => e.name === 'row1' && e.checked).length, 1);
   assert.equal(ev('check').filter((e) => e.name === 'row0').length, 0);
   assert.equal(ev('envoyer').length, 1);
+  assert.equal(ev('axeptio').length, 2);
   assert.equal(ev('confirmer').length, 1);
   assert.equal(ev('signed').length, 1);
 });
