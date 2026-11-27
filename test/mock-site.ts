@@ -15,6 +15,9 @@ const PAGE = /* html */ `<!doctype html><html><head><meta charset="utf-8"><title
 <style>
   ion-button,button,.btn{display:inline-block;padding:6px 12px;border:1px solid #333;cursor:pointer;margin:4px}
   ion-select-popover{position:fixed;top:100px;left:300px;background:#eee;border:1px solid #000;padding:4px;z-index:10}
+  #axeptio_overlay{position:fixed;inset:0;z-index:1000}
+  #axeptio_overlay .needsclick{position:absolute;inset:0}
+  #axeptio_overlay .axeptio-non-merci{position:relative;z-index:2;display:inline-block;margin:8px;background:#fff}
   ion-item{display:block;padding:4px;cursor:pointer}
   ion-radio,ion-checkbox{display:inline-block;width:20px;height:20px;border:1px solid #000;margin:4px;vertical-align:middle}
   .radio-checked,.checkbox-checked{background:#080}
@@ -28,6 +31,19 @@ let hybrid = false;
 
 function h(html){ app.innerHTML = html; }
 function bindBtn(sel, fn){ const e = document.querySelector(sel); if (e) e.addEventListener('click', fn); }
+function mountAxeptio(){
+  const old = document.getElementById('axeptio_overlay');
+  if (old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'axeptio_overlay';
+  overlay.className = 'axeptio_mount';
+  overlay.innerHTML = '<div class="needsclick"></div><span class="axeptio-non-merci">Non merci</span>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('.axeptio-non-merci').addEventListener('click', () => {
+    log('axeptio', {});
+    overlay.remove();
+  });
+}
 
 function openPopover(host, name, levels, onDone, tag){
   tag = tag || 'ion-select-popover';
@@ -89,9 +105,8 @@ const views = {
   login(){
     h('<h1>Connexion</h1><ion-input formcontrolname="identifiant"><input type="text"></ion-input>'
     + '<ion-input formcontrolname="password"><input type="password"></ion-input>'
-    + '<ion-button class="connexion"><span>Connexion</span></ion-button>'
-    + '<div id="axeptio"><button>Non merci</button></div>');
-    bindBtn('#axeptio button', () => document.getElementById('axeptio').remove());
+    + '<ion-button class="connexion"><span>Connexion</span></ion-button>');
+    mountAxeptio();
     bindBtn('.connexion', () => {
       const id = document.querySelector('[formcontrolname=identifiant] input').value;
       const pw = document.querySelector('[formcontrolname=password] input').value;
@@ -234,6 +249,7 @@ const views = {
   },
   confirm(){
     h('<ion-button><span>Confirmer</span></ion-button><ion-button class="reg" style="display:none"><span>Enregistrer</span></ion-button>');
+    mountAxeptio();
     document.querySelector('ion-button').addEventListener('click', () => { log('confirmer', {}); document.querySelector('.reg').style.display = 'inline-block'; });
     document.querySelector('.reg').addEventListener('click', () => go('sign'));
   },
